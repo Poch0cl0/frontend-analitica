@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import Login from './features/auth/Login'; 
 import SidebarLayout from './components/SidebarLayout';
 import DashboardOverview from './features/dashboard/DashboardOverview';
+import {PredictionPanel} from './features/risk-calculator/PredictionPanel';
 
 const UnderConstruction = ({ title }: { title: string }) => (
   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50">
@@ -49,7 +50,7 @@ function App() {
 
           <Route path="/prediccion" element={
             <SidebarLayout>
-              <UnderConstruction title="Predicción de Riesgo" />
+              <PredictionPanel />
             </SidebarLayout>
           } />
 
