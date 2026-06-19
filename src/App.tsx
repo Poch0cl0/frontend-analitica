@@ -8,6 +8,7 @@ import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import { NavProvider } from './contexts/NavContext';
 import { PredictionPanel } from './features/risk-calculator/PredictionPanel';
+import { RecommendationsList} from './features/recomendations/RecomendationsList'
 import TriajePage from './features/triaje/TriajePage';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
@@ -89,7 +90,7 @@ function App() {
 
             <Route path="/recomendaciones" element={
               <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
-                <SidebarLayout><UnderConstruction title="Recomendaciones Clínicas" /></SidebarLayout>
+                <SidebarLayout><RecommendationsList/></SidebarLayout>
               </ProtectedRoute>
             } />
 
