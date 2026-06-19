@@ -1,4 +1,5 @@
-import { useState, FormEvent, ChangeEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 
@@ -23,11 +24,6 @@ interface FormState {
   role: UserRole;
 }
 
-interface ApiError {
-  message: string;
-  status?: number;
-}
-
 // ==================== CONSTANTES ====================
 
 const ROLES: { value: UserRole; label: string }[] = [
@@ -44,7 +40,7 @@ const ERROR_MESSAGES: Record<number, string> = {
 
 // ==================== COMPONENTE PRINCIPAL ====================
 
-export default function Login(): JSX.Element {
+export default function Login() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<FormState>({
