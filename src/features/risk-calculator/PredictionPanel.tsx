@@ -299,6 +299,13 @@ export const PredictionPanel: React.FC = () => {
     return 'Sin consultas previas';
   };
 
+  // MAPEO DE COLORES DE RIESGO SEGUN PORCENTAJE
+  const getRiskColor = (percentage: number) => {
+    if (percentage < 30) return '#16A34A'; // Verde
+    if (percentage < 70) return '#D97706'; // Amarillo/Ámbar
+    return '#BA1A1A'; // Rojo
+  };
+
   // MAPEO DE COLORES DE RIESGO INSTITUCIONALES (Según Figma y specs/core-app.json)
   const getRiskStyles = (nivel: string | null | undefined) => {
     const safeNivel = nivel?.toLowerCase() || 'bajo';
@@ -513,7 +520,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.random_forest.prob_prematuro * 100)}
-                      strokeColor="#612853"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.random_forest.prob_prematuro * 100))}
                     />
                   </div>
 
@@ -583,7 +590,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.catboost.prob_prematuro * 100)}
-                      strokeColor="#F59E0B"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.catboost.prob_prematuro * 100))}
                     />
                   </div>
 
@@ -626,7 +633,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.svm.prob_prematuro * 100)}
-                      strokeColor="#BA1A1A"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.svm.prob_prematuro * 100))}
                     />
                   </div>
 

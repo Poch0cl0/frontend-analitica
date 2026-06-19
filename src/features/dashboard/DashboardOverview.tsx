@@ -59,8 +59,14 @@ export default function DashboardOverview() {
   // Estados del Dashboard
   const [resumen, setResumen] = useState<DashboardResumen | null>(null);
   const [citasHoy, setCitasHoy] = useState<CitaResponseEnriquecida[]>([]);
+  const [allCitas, setAllCitas] = useState<CitaResponseEnriquecida[]>([]); // NEW
   const [medicos, setMedicos] = useState<MedicoResumen[]>([]);
   const [pacientes, setPacientes] = useState<PacienteResponse[]>([]);
+  
+  // Derivar pacientes sin cita
+  const pacientesSinCita = pacientes.filter(p => 
+    !allCitas.some(c => c.paciente_id === p.id && (c.estado === 'programada' || c.estado === 'en_atencion'))
+  );
   
   // Estados de control
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -147,21 +153,23 @@ export default function DashboardOverview() {
       const day = String(todayDate.getDate()).padStart(2, '0');
       const localTodayStr = `${year}-${month}-${day}`;
 
-      // Peticiones paralelas
-      const [resumenData, citasData, medicosData, pacientesData] = await Promise.all([
-        getDashboardResumen(),
-        getCitas(localTodayStr),
-        getMedicos(),
-        getPacientes('', 1, 100)
-      ]);
+       // Peticiones paralelas
+       const [resumenData, citasHoyData, allCitasData, medicosData, pacientesData] = await Promise.all([
+         getDashboardResumen(),
+         getCitas(localTodayStr),
+         getCitas(), // Obtener todas las citas
+         getMedicos(),
+         getPacientes('', 1, 100)
+       ]);
 
-      setResumen(resumenData);
-      
-      // Ordenar citas por fecha/hora cronológicamente
-      const sortedCitas = [...citasData].sort((a, b) => 
-        new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
-      );
-      setCitasHoy(sortedCitas);
+       setResumen(resumenData);
+       setAllCitas(allCitasData); // Guardar todas las citas
+       
+       // Ordenar citas por fecha/hora cronológicamente
+       const sortedCitas = [...citasHoyData].sort((a, b) => 
+         new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
+       );
+       setCitasHoy(sortedCitas);
       
       setMedicos(medicosData);
       setPacientes(pacientesData.items);
@@ -304,6 +312,10 @@ export default function DashboardOverview() {
       await createCita(payload);
       showToastMsg('Cita programada con éxito', 'success');
       setActiveModal(null);
+      
+      // Actualizar localmente la lista de pacientes sin cita para reflejar el cambio inmediato
+      setPacientesSinCitaList(prev => prev.filter(p => p.id !== Number(newCita.paciente_id)));
+
       await loadData(false);
     } catch (err: any) {
       console.error(err);
@@ -458,26 +470,9 @@ export default function DashboardOverview() {
   const [pacientesSinCitaList, setPacientesSinCitaList] = useState<PacienteResponse[]>([]);
   const [isLoadingSinCita, setIsLoadingSinCita] = useState<boolean>(false);
 
-  const handleOpenPatientsWithoutAppointment = async () => {
+  const handleOpenPatientsWithoutAppointment = () => {
     setActiveModal('patientsWithoutAppointment');
-    setIsLoadingSinCita(true);
-    try {
-      // Para encontrar las pacientes sin cita, listamos las pacientes y filtramos 
-      // contra el listado de citas activas, o listamos de forma general.
-      // El backend provee /api/dashboard/resumen con pacientes_sin_cita conteo.
-      // Para efectos prácticos, cargamos los pacientes y los mostramos.
-      const response = await getPacientes('', 1, 100);
-      
-      // Simulación de filtro: aquellas que no tienen citas en_atencion o programadas
-      // En una base de datos real o backend con ese filtro lo haríamos por query.
-      // Aquí, listamos todas y permitimos agendar cita rápidamente.
-      setPacientesSinCitaList(response.items);
-    } catch (err) {
-      console.error(err);
-      showToastMsg('No se pudo cargar la lista de pacientes', 'error');
-    } finally {
-      setIsLoadingSinCita(false);
-    }
+    setPacientesSinCitaList(pacientesSinCita);
   };
 
   // ==================== FUNCIONES AUXILIARES DE DISEÑO ====================
@@ -665,7 +660,7 @@ export default function DashboardOverview() {
           <div className="flex items-center justify-between w-full">
             <div>
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pacientes sin Cita</span>
-              <h3 className="text-3xl font-extrabold text-gray-900 mt-1">{resumen?.pacientes_sin_cita ?? 0}</h3>
+              <h3 className="text-3xl font-extrabold text-gray-900 mt-1">{pacientesSinCita.length}</h3>
             </div>
             <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-50 text-amber-600 border border-amber-100">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
