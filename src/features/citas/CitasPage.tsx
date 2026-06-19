@@ -5,15 +5,23 @@ import {
   api,
   getCitas,
   getCitaById,
+  createCita,
   updateCita,
   deleteCita,
   changeCitaEstado,
   getMedicos,
+  getPacientes,
   createDatosClinicos,
   updateDatosClinicos,
   type DatosClinicosResponse,
 } from '../../services/api';
-import type { CitaResponseEnriquecida, MedicoResumen, CitaUpdate } from '../../services/api';
+import type {
+  CitaCreate,
+  CitaResponseEnriquecida,
+  MedicoResumen,
+  CitaUpdate,
+  PacienteResponse,
+} from '../../services/api';
 import {
   atenderFormToPayload,
   emptyAtenderForm,
@@ -31,14 +39,16 @@ import {
 
 const PRIMARY = '#612853';
 
-type ActiveModal = 'detail' | 'atender' | 'edit' | 'delete' | null;
+type ActiveModal = 'detail' | 'atender' | 'edit' | 'delete' | 'create' | null;
 
 export default function CitasPage() {
   const navigate = useNavigate();
   const isDoctor = localStorage.getItem('user_role') === 'medico';
+  const isSecretary = localStorage.getItem('user_role') === 'secretaria';
 
   const [citas, setCitas] = useState<CitaResponseEnriquecida[]>([]);
   const [medicos, setMedicos] = useState<MedicoResumen[]>([]);
+  const [pacientes, setPacientes] = useState<PacienteResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -67,6 +77,16 @@ export default function CitasPage() {
   });
   const [isUpdatingCita, setIsUpdatingCita] = useState(false);
 
+  const [newCita, setNewCita] = useState({
+    paciente_id: '',
+    medico_id: '',
+    fecha: '',
+    hora: '',
+    notas: '',
+    duracion_minutos: 30,
+  });
+  const [isCreatingCita, setIsCreatingCita] = useState(false);
+
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
@@ -76,19 +96,28 @@ export default function CitasPage() {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const [data, meds] = await Promise.all([
+      const requests: Promise<unknown>[] = [
         getCitas(filterFecha || undefined, undefined, filterEstado || undefined),
         getMedicos(),
-      ]);
+      ];
+      if (!isDoctor) {
+        requests.push(getPacientes('', 1, 100));
+      }
+      const results = await Promise.all(requests);
+      const data = results[0] as CitaResponseEnriquecida[];
+      const meds = results[1] as MedicoResumen[];
       setCitas(data.sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()));
       setMedicos(meds);
+      if (!isDoctor && results[2]) {
+        setPacientes((results[2] as { items: PacienteResponse[] }).items);
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg('Error al cargar las citas.');
     } finally {
       setIsLoading(false);
     }
-  }, [filterFecha, filterEstado]);
+  }, [filterFecha, filterEstado, isDoctor]);
 
   useEffect(() => {
     loadCitas();
@@ -203,6 +232,64 @@ export default function CitasPage() {
     }
   };
 
+  const handleOpenCreateModal = () => {
+    const now = new Date();
+    const localDate = now.toISOString().split('T')[0];
+    const localTime = `${String(now.getHours() + 1).padStart(2, '0')}:00`;
+
+    setNewCita({
+      paciente_id: '',
+      medico_id: '',
+      fecha: localDate,
+      hora: localTime,
+      notas: '',
+      duracion_minutos: 30,
+    });
+    setActiveModal('create');
+  };
+
+  const handleCreateCitaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!newCita.paciente_id || !newCita.fecha || !newCita.hora) {
+      showToast('Por favor, selecciona paciente, fecha y hora', 'error');
+      return;
+    }
+
+    const pacienteSel = pacientes.find(p => p.id === Number(newCita.paciente_id));
+    const medicoId = isSecretary
+      ? pacienteSel?.medico_asignado_id
+      : Number(newCita.medico_id);
+
+    if (!medicoId) {
+      showToast(
+        isSecretary
+          ? 'La paciente no tiene médico asignado. Asigne un médico en el expediente antes de agendar.'
+          : 'Por favor, selecciona un médico',
+        'error',
+      );
+      return;
+    }
+
+    setIsCreatingCita(true);
+    try {
+      const payload: CitaCreate = {
+        paciente_id: Number(newCita.paciente_id),
+        medico_id: medicoId,
+        fecha_hora: `${newCita.fecha}T${newCita.hora}:00`,
+        duracion_minutos: newCita.duracion_minutos,
+        notas: newCita.notas,
+      };
+      await createCita(payload);
+      showToast('Cita programada con éxito', 'success');
+      setActiveModal(null);
+      await loadCitas();
+    } catch (err: any) {
+      showToast(err?.response?.data?.detail || 'No se pudo programar la cita', 'error');
+    } finally {
+      setIsCreatingCita(false);
+    }
+  };
+
   const handleOpenEditModal = (cita: CitaResponseEnriquecida) => {
     const dt = new Date(cita.fecha_hora);
     setSelectedCitaId(cita.id);
@@ -278,15 +365,30 @@ export default function CitasPage() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl font-extrabold text-gray-900">
-          {isDoctor ? 'Mis Citas' : 'Gestión de Citas'}
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {isDoctor
-            ? 'Consulta el detalle y atiende citas registrando los datos clínicos de la paciente.'
-            : 'Administra el calendario de citas del servicio obstétrico.'}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900">
+            {isDoctor ? 'Mis Citas' : 'Gestión de Citas'}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {isDoctor
+              ? 'Consulta el detalle y atiende citas registrando los datos clínicos de la paciente.'
+              : 'Administra el calendario de citas del servicio obstétrico.'}
+          </p>
+        </div>
+        {!isDoctor && (
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150 shrink-0"
+            style={{ backgroundColor: PRIMARY }}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Agendar Nueva Cita</span>
+          </button>
+        )}
       </div>
 
       {errorMsg && (
@@ -352,7 +454,7 @@ export default function CitasPage() {
                   <th className="py-3.5 px-4">Hora</th>
                   <th className="py-3.5 px-4">Paciente</th>
                   <th className="py-3.5 px-4">Médico</th>
-                  <th className="py-3.5 px-4">Tipo de Cita</th>
+                  <th className="py-3.5 px-4">Duración</th>
                   <th className="py-3.5 px-4">Estado</th>
                   <th className="py-3.5 px-5 text-right">Acciones</th>
                 </tr>
@@ -374,7 +476,7 @@ export default function CitasPage() {
                     <td className="py-3.5 px-4 text-gray-600 font-medium whitespace-nowrap">
                       {cita.medico_nombre ? `Dr. ${cita.medico_nombre.split(' ')[0]}` : '--'}
                     </td>
-                    <td className="py-3.5 px-4 text-gray-600 font-medium">{cita.motivo || 'N/A'}</td>
+                    <td className="py-3.5 px-4 text-gray-600 font-medium">{cita.duracion_minutos} min</td>
                     <td className="py-3.5 px-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeStyles(cita.estado)}`}>
                         {getStatusLabel(cita.estado)}
@@ -460,6 +562,121 @@ export default function CitasPage() {
           onChange={setAtenderDcForm}
           onSubmit={handleAtender}
         />
+      )}
+
+      {activeModal === 'create' && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-extrabold text-lg text-gray-900">Agendar Nueva Cita</h3>
+              <button type="button" onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <form onSubmit={handleCreateCitaSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Paciente (Gestante) *</label>
+                <select
+                  required
+                  value={newCita.paciente_id}
+                  onChange={e => setNewCita(prev => ({ ...prev, paciente_id: e.target.value }))}
+                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+                >
+                  <option value="">Seleccionar Paciente</option>
+                  {pacientes.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre} {p.apellidos} (DNI {p.dni})</option>
+                  ))}
+                </select>
+              </div>
+
+              {!isSecretary && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Obstetra Médico *</label>
+                  <select
+                    required
+                    value={newCita.medico_id}
+                    onChange={e => setNewCita(prev => ({ ...prev, medico_id: e.target.value }))}
+                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+                  >
+                    <option value="">Seleccionar Médico</option>
+                    {medicos.map(m => (
+                      <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isSecretary && newCita.paciente_id && (() => {
+                const p = pacientes.find(x => x.id === Number(newCita.paciente_id));
+                const med = p?.medico_asignado_id ? medicos.find(m => m.id === p.medico_asignado_id) : null;
+                return (
+                  <div className="p-3 rounded-xl bg-fuchsia-50/50 border border-fuchsia-100 text-xs text-gray-600">
+                    {med
+                      ? <>Médico asignado: <strong className="text-gray-800">Dr. {med.nombre} {med.apellidos}</strong></>
+                      : <span className="text-amber-700 font-semibold">Esta paciente no tiene médico asignado.</span>}
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Fecha *</label>
+                  <input
+                    type="date"
+                    required
+                    value={newCita.fecha}
+                    onChange={e => setNewCita(prev => ({ ...prev, fecha: e.target.value }))}
+                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Hora *</label>
+                  <input
+                    type="time"
+                    required
+                    value={newCita.hora}
+                    onChange={e => setNewCita(prev => ({ ...prev, hora: e.target.value }))}
+                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-bold text-gray-500 uppercase">Duración de la consulta</label>
+                  <span className="text-xs font-bold" style={{ color: PRIMARY }}>{newCita.duracion_minutos} minutos</span>
+                </div>
+                <input
+                  type="range"
+                  min="15"
+                  max="120"
+                  step="15"
+                  value={newCita.duracion_minutos}
+                  onChange={e => setNewCita(prev => ({ ...prev, duracion_minutos: Number(e.target.value) }))}
+                  className="w-full accent-fuchsia-900 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Notas o Comentarios</label>
+                <textarea
+                  rows={3}
+                  value={newCita.notas}
+                  onChange={e => setNewCita(prev => ({ ...prev, notas: e.target.value }))}
+                  placeholder="Síntomas iniciales, antecedentes, requerimientos especiales..."
+                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                <button type="button" onClick={() => setActiveModal(null)} className="py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={isCreatingCita} className="py-2.5 px-6 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: PRIMARY }}>
+                  {isCreatingCita ? 'Programando...' : 'Programar Cita'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {activeModal === 'edit' && (

@@ -72,19 +72,13 @@ function getStatusLabel(estado: string) {
   return map[estado] || estado;
 }
 
-const TIPO_CITA_OPTIONS = [
-  { value: 'Control Prenatal', label: 'Control Prenatal de Rutina' },
-  { value: 'Consulta Inicial', label: 'Consulta Inicial / Primera Cita' },
-  { value: 'Ecografía Obstétrica', label: 'Ecografía Obstétrica' },
-  { value: 'Monitoreo Fetal', label: 'Monitoreo Fetal' },
-  { value: 'Urgencia Prenatal', label: 'Control Urgente por Riesgo' },
-  { value: 'Consulta Especialidad', label: 'Evaluación de Especialidad (Alto Riesgo)' },
-];
-
-// ── CITA MODAL (solo secretaria) ──────────────────────────────────────────────
+// ── CITA MODAL (secretaria / admin) ───────────────────────────────────────────
 interface CitaFormData {
-  fecha: string; hora: string; medico_id: string;
-  motivo: string; duracion_minutos: number; notas: string;
+  fecha: string;
+  hora: string;
+  medico_id: string;
+  duracion_minutos: number;
+  notas: string;
 }
 
 interface CitaModalProps {
@@ -93,13 +87,15 @@ interface CitaModalProps {
   pacienteNombre: string;
   medicos: MedicoResumen[];
   isSaving: boolean;
+  simplified?: boolean;
+  medicoAsignadoLabel?: string | null;
   onClose: () => void;
   onSubmit: (e: FormEvent) => void;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   onDuracionChange: (v: number) => void;
 }
 
-function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, onClose, onSubmit, onChange, onDuracionChange }: CitaModalProps) {
+function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, simplified, medicoAsignadoLabel, onClose, onSubmit, onChange, onDuracionChange }: CitaModalProps) {
   const inputCls = "w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all bg-white";
   const borderStyle = { borderColor: '#E8D5EF' };
 
@@ -134,6 +130,17 @@ function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, onClose, onS
             <label className="block text-xs font-semibold text-gray-500 mb-1">Paciente</label>
             <input readOnly value={pacienteNombre} className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed`} style={borderStyle} />
           </div>
+          {simplified && mode === 'create' ? (
+            medicoAsignadoLabel ? (
+              <div className="p-3 rounded-xl bg-fuchsia-50/50 border border-fuchsia-100 text-xs text-gray-600">
+                Médico asignado: <strong className="text-gray-800">{medicoAsignadoLabel}</strong>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-800 font-semibold">
+                Esta paciente no tiene médico asignado.
+              </div>
+            )
+          ) : (
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Obstetra Médico *</label>
             <select name="medico_id" required value={form.medico_id} onChange={onChange}
@@ -144,6 +151,7 @@ function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, onClose, onS
               {medicos.map(m => <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>)}
             </select>
           </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha *</label>
@@ -159,15 +167,6 @@ function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, onClose, onS
                 onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
                 onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'} />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de Cita *</label>
-            <select name="motivo" value={form.motivo} onChange={onChange}
-              className={inputCls} style={borderStyle}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'}>
-              {TIPO_CITA_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
           </div>
           <div>
             <div className="flex justify-between items-center mb-1">
@@ -245,7 +244,7 @@ export default function PacienteDetalle() {
   const [selectedCita, setSelectedCita] = useState<CitaResponseEnriquecida | null>(null);
   const [isSavingCita, setIsSavingCita] = useState(false);
   const [citaForm, setCitaForm] = useState<CitaFormData>({
-    fecha: '', hora: '', medico_id: '', motivo: 'Control Prenatal', duracion_minutos: 30, notas: '',
+    fecha: '', hora: '', medico_id: '', duracion_minutos: 30, notas: '',
   });
 
   // Atender cita modal (médico)
@@ -427,7 +426,7 @@ export default function PacienteDetalle() {
     setCitaForm({
       fecha: now.toISOString().split('T')[0],
       hora: `${String(now.getHours() + 1).padStart(2, '0')}:00`,
-      medico_id: '', motivo: 'Control Prenatal', duracion_minutos: 30, notas: '',
+      medico_id: '', duracion_minutos: 30, notas: '',
     });
     setCitaModal('create');
   };
@@ -435,14 +434,18 @@ export default function PacienteDetalle() {
   const handleCreateCita = async (e: FormEvent) => {
     e.preventDefault();
     if (!paciente) return;
+    const medicoId = isSecretary ? paciente.medico_asignado_id : Number(citaForm.medico_id);
+    if (!medicoId) {
+      showToast('La paciente no tiene médico asignado', 'error');
+      return;
+    }
     setIsSavingCita(true);
     try {
       const payload: CitaCreate = {
         paciente_id: paciente.id,
-        medico_id: Number(citaForm.medico_id),
+        medico_id: medicoId,
         fecha_hora: `${citaForm.fecha}T${citaForm.hora}:00`,
         duracion_minutos: citaForm.duracion_minutos,
-        motivo: citaForm.motivo,
         notas: citaForm.notas || null,
       };
       await createCita(payload);
@@ -466,7 +469,6 @@ export default function PacienteDetalle() {
       fecha: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`,
       hora: `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`,
       medico_id: String(cita.medico_id),
-      motivo: cita.motivo || 'Control Prenatal',
       duracion_minutos: cita.duracion_minutos,
       notas: cita.notas || '',
     });
@@ -481,7 +483,6 @@ export default function PacienteDetalle() {
       const payload: CitaUpdate = {
         fecha_hora: `${citaForm.fecha}T${citaForm.hora}:00`,
         medico_id: Number(citaForm.medico_id),
-        motivo: citaForm.motivo,
         duracion_minutos: citaForm.duracion_minutos,
         notas: citaForm.notas || null,
       };
@@ -771,7 +772,7 @@ export default function PacienteDetalle() {
                   <tr className="bg-slate-50 border-b border-gray-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="py-3.5 px-5">Fecha y Hora</th>
                     <th className="py-3.5 px-4">Médico</th>
-                    <th className="py-3.5 px-4">Tipo de Cita</th>
+                    <th className="py-3.5 px-4">Notas</th>
                     <th className="py-3.5 px-4">Duración</th>
                     <th className="py-3.5 px-4">Estado</th>
                     <th className="py-3.5 px-5 text-right">Acciones</th>
@@ -787,7 +788,9 @@ export default function PacienteDetalle() {
                       <td className="py-3.5 px-4 text-sm text-gray-600">
                         {cita.medico_nombre ? `Dr. ${cita.medico_nombre.split(' ')[0]}` : '—'}
                       </td>
-                      <td className="py-3.5 px-4 text-sm text-gray-600">{cita.motivo || 'Control Prenatal'}</td>
+                      <td className="py-3.5 px-4 text-sm text-gray-600 max-w-[200px] truncate" title={cita.notas || undefined}>
+                        {cita.notas || '—'}
+                      </td>
                       <td className="py-3.5 px-4 text-sm text-gray-500">{cita.duracion_minutos} min</td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(cita.estado)}`}>
@@ -958,6 +961,15 @@ export default function PacienteDetalle() {
           pacienteNombre={`${paciente.nombre} ${paciente.apellidos}`}
           medicos={medicos}
           isSaving={isSavingCita}
+          simplified={isSecretary && citaModal === 'create'}
+          medicoAsignadoLabel={
+            paciente.medico_asignado_id
+              ? (() => {
+                  const m = medicos.find(x => x.id === paciente.medico_asignado_id);
+                  return m ? `Dr. ${m.nombre} ${m.apellidos}` : null;
+                })()
+              : null
+          }
           onClose={() => setCitaModal(null)}
           onSubmit={citaModal === 'create' ? handleCreateCita : handleEditCita}
           onChange={e => setCitaForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
@@ -1011,7 +1023,7 @@ export default function PacienteDetalle() {
                 <div>
                   <h2 className="text-base font-bold text-gray-900">Atender Cita</h2>
                   <p className="text-xs text-gray-500">
-                    {atenderCita.motivo} · {formatDate(atenderCita.fecha_hora)} {formatHour(atenderCita.fecha_hora)}
+                    {formatDate(atenderCita.fecha_hora)} {formatHour(atenderCita.fecha_hora)}
                   </p>
                 </div>
               </div>

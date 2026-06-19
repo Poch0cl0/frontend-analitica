@@ -36,6 +36,7 @@ export interface DashboardResumen {
   total_pacientes: number;
   citas_hoy: number;
   citas_pendientes_confirmacion: number;
+  citas_pendientes_activas: number;
   citas_semana: number;
   pacientes_sin_cita: number;
 }
@@ -51,7 +52,6 @@ export interface CitaCreate {
   medico_id: number;
   fecha_hora: string; // ISO 8601 string
   duracion_minutos?: number;
-  motivo?: string | null;
   notas?: string | null;
 }
 
@@ -59,7 +59,6 @@ export interface CitaUpdate {
   fecha_hora?: string | null;
   medico_id?: number | null;
   estado?: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada' | null;
-  motivo?: string | null;
   notas?: string | null;
   duracion_minutos?: number | null;
 }
@@ -71,7 +70,6 @@ export interface CitaResponse {
   fecha_hora: string;
   duracion_minutos: number;
   estado: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada';
-  motivo: string | null;
   notas: string | null;
   created_at: string;
 }
@@ -353,6 +351,65 @@ export const getCurrentUser = async (): Promise<CurrentUser> => {
   return response.data;
 };
 
+// ==================== USUARIOS (ADMIN) ====================
+
+export interface RolResponse {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+}
+
+export interface UsuarioResponse {
+  id: number;
+  email: string;
+  nombre: string;
+  apellidos: string;
+  rol: RolResponse;
+  activo: boolean;
+  created_at: string;
+}
+
+export interface UsuarioCreatePayload {
+  email: string;
+  password: string;
+  nombre: string;
+  apellidos: string;
+  rol_id: number;
+}
+
+export interface UsuarioUpdatePayload {
+  email?: string;
+  nombre?: string;
+  apellidos?: string;
+  rol_id?: number;
+  activo?: boolean;
+}
+
+export const getRoles = async (): Promise<RolResponse[]> => {
+  const response = await api.get<RolResponse[]>('/api/usuarios/roles');
+  return response.data;
+};
+
+export const getUsuarios = async (): Promise<UsuarioResponse[]> => {
+  const response = await api.get<UsuarioResponse[]>('/api/usuarios/');
+  return response.data;
+};
+
+export const createUsuario = async (data: UsuarioCreatePayload): Promise<UsuarioResponse> => {
+  const response = await api.post<UsuarioResponse>('/api/usuarios/', data);
+  return response.data;
+};
+
+export const updateUsuario = async (id: number, data: UsuarioUpdatePayload): Promise<UsuarioResponse> => {
+  const response = await api.put<UsuarioResponse>(`/api/usuarios/${id}`, data);
+  return response.data;
+};
+
+export const desactivarUsuario = async (id: number): Promise<UsuarioResponse> => {
+  const response = await api.delete<UsuarioResponse>(`/api/usuarios/${id}`);
+  return response.data;
+};
+
 // ==================== HISTORIAL DE PREDICCIONES ====================
 
 export interface PrediccionHistorialItem {
@@ -451,5 +508,40 @@ export interface RecomendacionResponse {
 
 export const getRecomendacionesPaciente = async (pacienteId: number): Promise<RecomendacionResponse[]> => {
   const response = await api.get<RecomendacionResponse[]>(`/api/recomendaciones/paciente/${pacienteId}`);
+  return response.data;
+};
+
+// ==================== REPORTES ====================
+
+export type TipoReporte = 'completo' | 'prediccion' | 'triaje';
+
+export interface EnviarReporteResponse {
+  enviado: boolean;
+  email: string;
+  tipo: string;
+  mensaje: string;
+}
+
+export const exportarReportePaciente = async (
+  pacienteId: number,
+  format: 'pdf' | 'xlsx' = 'pdf',
+  tipo: TipoReporte = 'completo',
+): Promise<Blob> => {
+  const response = await api.get(`/api/reportes/paciente/${pacienteId}/export`, {
+    params: { format, tipo },
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+export const enviarReportePaciente = async (
+  pacienteId: number,
+  tipo: TipoReporte = 'prediccion',
+): Promise<EnviarReporteResponse> => {
+  const response = await api.post<EnviarReporteResponse>(
+    `/api/reportes/paciente/${pacienteId}/enviar`,
+    null,
+    { params: { tipo } },
+  );
   return response.data;
 };

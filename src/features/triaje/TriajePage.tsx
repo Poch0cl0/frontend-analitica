@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTriajePriorizados, sincronizarTriaje } from '../../services/api';
+import { getTriajePriorizados, sincronizarTriaje, exportarReportePaciente, enviarReportePaciente } from '../../services/api';
 import type { TriajePriorizadoItem, TriajeAlgoritmo } from '../../services/api';
 import PacienteClinicoModal from './PacienteClinicoModal';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
@@ -60,6 +60,8 @@ export default function TriajePage() {
   const [filtrados, setFiltrados] = useState<TriajePriorizadoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [reportMsg, setReportMsg] = useState<string | null>(null);
+  const [reportLoadingId, setReportLoadingId] = useState<number | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [clinicoModal, setClinicoModal] = useState<{
     nombre: string;
@@ -77,6 +79,42 @@ export default function TriajePage() {
       form: loaded.form,
       loading: false,
     });
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadReport = async (pacienteId: number, dni: string) => {
+    setReportLoadingId(pacienteId);
+    setReportMsg(null);
+    try {
+      const blob = await exportarReportePaciente(pacienteId, 'pdf', 'triaje');
+      downloadBlob(blob, `triaje_${dni}.pdf`);
+    } catch {
+      setReportMsg('No se pudo generar el reporte PDF.');
+    } finally {
+      setReportLoadingId(null);
+    }
+  };
+
+  const handleSendReport = async (pacienteId: number) => {
+    setReportLoadingId(pacienteId);
+    setReportMsg(null);
+    try {
+      const res = await enviarReportePaciente(pacienteId, 'triaje');
+      setReportMsg(res.mensaje);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setReportMsg(typeof detail === 'string' ? detail : 'Error al enviar el reporte.');
+    } finally {
+      setReportLoadingId(null);
+    }
   };
 
   const conteos: Record<NivelUrgencia, number> = {
@@ -145,6 +183,16 @@ export default function TriajePage() {
             Pacientes con predicción de riesgo registrada · última actualización: hace {minsAgo < 1 ? 'un momento' : `${minsAgo} min`}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2 self-start print:hidden">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimir reporte
+          </button>
         <button onClick={handleActualizar} disabled={isLoading}
           className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 shadow-sm self-start"
           style={{ backgroundColor: PRIMARY }}>
@@ -153,7 +201,18 @@ export default function TriajePage() {
           </svg>
           Actualizar Triaje
         </button>
+        </div>
       </div>
+
+      {reportMsg && (
+        <div className={`rounded-xl px-4 py-2.5 text-sm font-semibold print:hidden ${
+          reportMsg.includes('enviado') || reportMsg.includes('Enviado')
+            ? 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+            : 'text-amber-800 bg-amber-50 border border-amber-200'
+        }`}>
+          {reportMsg}
+        </div>
+      )}
 
       {syncMsg && (
         <div className="rounded-xl px-4 py-2.5 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200">
@@ -331,6 +390,21 @@ export default function TriajePage() {
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50"
                   >
                     Ver
+                  </button>
+                  <button
+                    onClick={() => handleDownloadReport(p.paciente_id, p.dni)}
+                    disabled={reportLoadingId === p.paciente_id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 print:hidden"
+                  >
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => handleSendReport(p.paciente_id)}
+                    disabled={reportLoadingId === p.paciente_id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 print:hidden"
+                    style={{ backgroundColor: PRIMARY }}
+                  >
+                    Enviar
                   </button>
                 </div>
               </div>

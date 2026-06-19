@@ -658,9 +658,9 @@ export default function PacientesPage() {
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Citas pendientes</p>
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-extrabold text-gray-900">{resumen?.citas_semana ?? '—'}</span>
+            <span className="text-3xl font-extrabold text-gray-900">{resumen?.citas_pendientes_activas ?? '—'}</span>
           </div>
-          <p className="text-xs text-gray-400 font-medium mt-1">Para los próximos 7 días</p>
+          <p className="text-xs text-gray-400 font-medium mt-1">Programadas o en atención</p>
         </div>
 
         {!isDoctor ? (

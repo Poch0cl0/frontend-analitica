@@ -6,6 +6,7 @@ import {
   ejecutarPrediccionConsenso,
   getPacientes,
   getHistorialPredicciones,
+  enviarReportePaciente,
 } from '../../services/api';
 import type {
   PacientePerfilResponse,
@@ -17,6 +18,7 @@ import {
   ClipboardList,
   ChevronDown,
   Printer,
+  Mail,
   ArrowRight,
   Search,
   AlertTriangle,
@@ -205,6 +207,8 @@ export const PredictionPanel: React.FC = () => {
   const [calculating, setCalculating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(true);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
 
   // Cargar lista de pacientes al montar
   useEffect(() => {
@@ -282,6 +286,21 @@ export const PredictionPanel: React.FC = () => {
   // Imprimir reporte clínico ocultando partes innecesarias
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSendEmail = async () => {
+    if (selectedPacienteId === null) return;
+    setSendingEmail(true);
+    setEmailMsg(null);
+    try {
+      const res = await enviarReportePaciente(selectedPacienteId, 'prediccion');
+      setEmailMsg(res.mensaje);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setEmailMsg(typeof detail === 'string' ? detail : 'No se pudo enviar el reporte por correo.');
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   // Filtrar pacientes según la búsqueda (Nombre, Apellidos o DNI)
@@ -815,12 +834,29 @@ export const PredictionPanel: React.FC = () => {
       )}
 
       {/* 4. ACCIONES INFERIORES */}
+      {emailMsg && (
+        <div className={`rounded-xl px-4 py-2.5 text-sm font-semibold print:hidden ${
+          emailMsg.includes('enviado') || emailMsg.includes('Enviado')
+            ? 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+            : 'text-amber-800 bg-amber-50 border border-amber-200'
+        }`}>
+          {emailMsg}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-4 print:hidden">
         <button
           onClick={handlePrint}
           className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2 shadow-sm"
         >
           <Printer className="w-4 h-4 text-slate-500" /> Imprimir Reporte Clínico
+        </button>
+        <button
+          onClick={handleSendEmail}
+          disabled={sendingEmail || selectedPacienteId === null || !prediction?.prediccion_id}
+          className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+        >
+          <Mail className={`w-4 h-4 text-slate-500 ${sendingEmail ? 'animate-pulse' : ''}`} />
+          {sendingEmail ? 'Enviando...' : 'Enviar reporte al paciente'}
         </button>
         <button
           onClick={handleCalcularConsenso}

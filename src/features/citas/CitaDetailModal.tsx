@@ -92,11 +92,7 @@ export default function CitaDetailModal({
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Obstetra Asignado</span>
                 <p className="text-sm font-bold text-gray-900">Dr. {cita.medico_nombre}</p>
               </div>
-              <div className="border border-gray-100 p-3.5 rounded-xl bg-white shadow-xs">
-                <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tipo de Consulta</span>
-                <p className="text-sm font-bold text-gray-900">{cita.motivo || 'Control Ordinario'}</p>
-              </div>
-              <div className="border border-gray-100 p-3.5 rounded-xl bg-white shadow-xs">
+              <div className="border border-gray-100 p-3.5 rounded-xl bg-white shadow-xs sm:col-span-2">
                 <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Duración Estimada</span>
                 <p className="text-sm font-bold text-gray-900">{cita.duracion_minutos} minutos</p>
               </div>

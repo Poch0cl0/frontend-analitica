@@ -11,6 +11,7 @@ import { PredictionPanel } from './features/risk-calculator/PredictionPanel';
 import { RecommendationsList} from './features/recomendations/RecomendationsList'
 import TriajePage from './features/triaje/TriajePage';
 import RecomendacionesPacientePage from './features/recomendaciones/RecomendacionesPacientePage';
+import UsuariosPage from './features/usuarios/UsuariosPage';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
 const ADMIN_ROLES = ['administrador'];
@@ -104,7 +105,7 @@ function App() {
             {/* Solo administrador */}
             <Route path="/usuarios" element={
               <ProtectedRoute allowedRoles={ADMIN_ROLES}>
-                <SidebarLayout><UnderConstruction title="Gestión de Usuarios y Roles" /></SidebarLayout>
+                <SidebarLayout><UsuariosPage /></SidebarLayout>
               </ProtectedRoute>
             } />
 

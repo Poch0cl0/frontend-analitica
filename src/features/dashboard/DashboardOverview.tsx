@@ -69,6 +69,7 @@ export default function DashboardOverview() {
   const location = useLocation();
   const navigate = useNavigate();
   const isDoctor = localStorage.getItem('user_role') === 'medico';
+  const isSecretary = localStorage.getItem('user_role') === 'secretaria';
 
   // Estados del Dashboard
   const [resumen, setResumen] = useState<DashboardResumen | null>(null);
@@ -121,7 +122,6 @@ export default function DashboardOverview() {
     medico_id: string;
     fecha: string;
     hora: string;
-    motivo: string;
     notas: string;
     duracion_minutos: number;
   }>({
@@ -129,7 +129,6 @@ export default function DashboardOverview() {
     medico_id: '',
     fecha: '',
     hora: '',
-    motivo: 'Control Prenatal',
     notas: '',
     duracion_minutos: 30
   });
@@ -150,16 +149,6 @@ export default function DashboardOverview() {
     notas: ''
   });
   const [isUpdatingCita, setIsUpdatingCita] = useState<boolean>(false);
-
-  // Mapeos de tipo de cita/control UI -> backend 'motivo'
-  const TIPO_CITA_OPTIONS = [
-    { value: 'Control Prenatal', label: 'Control Prenatal de Rutina' },
-    { value: 'Consulta Inicial', label: 'Consulta Inicial / Primera Cita' },
-    { value: 'Ecografía Obstétrica', label: 'Ecografía Obstétrica' },
-    { value: 'Monitoreo Fetal', label: 'Monitoreo Fetal' },
-    { value: 'Urgencia Prenatal', label: 'Control Urgente por Riesgo' },
-    { value: 'Consulta Especialidad', label: 'Evaluación de Especialidad (Alto Riesgo)' }
-  ];
 
   // ==================== EFECTOS DE CARGA INICIAL ====================
 
@@ -314,7 +303,6 @@ export default function DashboardOverview() {
       medico_id: '',
       fecha: localDate,
       hora: localTime,
-      motivo: 'Control Prenatal',
       notas: '',
       duracion_minutos: 30
     });
@@ -324,22 +312,35 @@ export default function DashboardOverview() {
 
   const handleCreateCitaSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!newCita.paciente_id || !newCita.medico_id || !newCita.fecha || !newCita.hora) {
-      showToastMsg('Por favor, selecciona paciente, médico, fecha y hora', 'error');
+    if (!newCita.paciente_id || !newCita.fecha || !newCita.hora) {
+      showToastMsg('Por favor, selecciona paciente, fecha y hora', 'error');
+      return;
+    }
+
+    const pacienteSel = pacientes.find(p => p.id === Number(newCita.paciente_id));
+    const medicoId = isSecretary
+      ? pacienteSel?.medico_asignado_id
+      : Number(newCita.medico_id);
+
+    if (!medicoId) {
+      showToastMsg(
+        isSecretary
+          ? 'La paciente no tiene médico asignado. Asigne un médico en el expediente antes de agendar.'
+          : 'Por favor, selecciona un médico',
+        'error',
+      );
       return;
     }
 
     setIsCreatingCita(true);
     try {
-      // Combinar fecha y hora
       const datetimeStr = `${newCita.fecha}T${newCita.hora}:00`;
       
       const payload: CitaCreate = {
         paciente_id: Number(newCita.paciente_id),
-        medico_id: Number(newCita.medico_id),
+        medico_id: medicoId,
         fecha_hora: datetimeStr,
         duracion_minutos: newCita.duracion_minutos,
-        motivo: newCita.motivo,
         notas: newCita.notas
       };
 
@@ -826,7 +827,7 @@ export default function DashboardOverview() {
                     <th className="py-3.5 px-4">Hora</th>
                     <th className="py-3.5 px-4">Paciente</th>
                     <th className="py-3.5 px-4">Médico</th>
-                    <th className="py-3.5 px-4">Tipo de Cita</th>
+                    <th className="py-3.5 px-4">Duración</th>
                     <th className="py-3.5 px-4">Estado</th>
                     <th className="py-3.5 px-5 text-right">Acciones</th>
                   </tr>
@@ -850,7 +851,7 @@ export default function DashboardOverview() {
                         {cita.medico_nombre ? `Dr. ${cita.medico_nombre.split(' ')[0]}` : '--'}
                       </td>
                       <td className="py-3.5 px-4 text-gray-600 font-medium">
-                        {cita.motivo || 'N/A'}
+                        {cita.duracion_minutos} min
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeStyles(cita.estado)}`}>
@@ -1118,6 +1119,8 @@ export default function DashboardOverview() {
                 )}
               </div>
 
+              {!isSecretary && (
+              <>
               {/* Médico / Obstetra */}
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Obstetra Médico *</label>
@@ -1133,6 +1136,20 @@ export default function DashboardOverview() {
                   ))}
                 </select>
               </div>
+              </>
+              )}
+
+              {isSecretary && newCita.paciente_id && (() => {
+                const p = pacientes.find(x => x.id === Number(newCita.paciente_id));
+                const med = p?.medico_asignado_id ? medicos.find(m => m.id === p.medico_asignado_id) : null;
+                return (
+                  <div className="p-3 rounded-xl bg-fuchsia-50/50 border border-fuchsia-100 text-xs text-gray-600">
+                    {med
+                      ? <>Médico asignado: <strong className="text-gray-800">Dr. {med.nombre} {med.apellidos}</strong></>
+                      : <span className="text-amber-700 font-semibold">Esta paciente no tiene médico asignado.</span>}
+                  </div>
+                );
+              })()}
 
               {/* Fecha y Hora */}
               <div className="grid grid-cols-2 gap-4">
@@ -1158,21 +1175,6 @@ export default function DashboardOverview() {
                 </div>
               </div>
 
-              {/* Tipo de Cita UI -> backend 'motivo' */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tipo de Cita / Control *</label>
-                <select
-                  required
-                  value={newCita.motivo}
-                  onChange={(e) => setNewCita(prev => ({ ...prev, motivo: e.target.value }))}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                >
-                  {TIPO_CITA_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* Duración en Minutos */}
               <div>
                 <div className="flex justify-between items-center mb-1">
@@ -1192,7 +1194,7 @@ export default function DashboardOverview() {
 
               {/* Notas Adicionales */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notas o Comentarios Médicos</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notas o Comentarios</label>
                 <textarea
                   rows={3}
                   value={newCita.notas}
@@ -1485,14 +1487,6 @@ export default function DashboardOverview() {
                     </p>
                   </div>
 
-                  {/* Tipo de Cita / Motivo */}
-                  <div className="border border-gray-100 p-3.5 rounded-xl bg-white shadow-xs">
-                    <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tipo de Consulta (Motivo)</span>
-                    <p className="text-sm font-bold text-gray-900">
-                      {selectedCitaDetail?.motivo || 'Control Ordinario'}
-                    </p>
-                  </div>
-
                   {/* Duración */}
                   <div className="border border-gray-100 p-3.5 rounded-xl bg-white shadow-xs">
                     <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Duración Estimada</span>
@@ -1693,7 +1687,7 @@ export default function DashboardOverview() {
                 <div>
                   <h2 className="text-base font-bold text-gray-900">Atender Cita</h2>
                   <p className="text-xs text-gray-500">
-                    {selectedCitaDetail.paciente_nombre} · {selectedCitaDetail.motivo} · {formatHour(selectedCitaDetail.fecha_hora)}
+                    {selectedCitaDetail.paciente_nombre} · {formatHour(selectedCitaDetail.fecha_hora)}
                   </p>
                 </div>
               </div>

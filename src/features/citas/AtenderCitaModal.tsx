@@ -37,7 +37,7 @@ export default function AtenderCitaModal({
             <div>
               <h2 className="text-base font-bold text-gray-900">Atender Cita</h2>
               <p className="text-xs text-gray-500">
-                {cita.paciente_nombre} · {cita.motivo} · {formatHour(cita.fecha_hora)}
+                {cita.paciente_nombre} · {formatHour(cita.fecha_hora)}
               </p>
             </div>
           </div>

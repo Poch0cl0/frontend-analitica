@@ -136,21 +136,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex bg-white">
       {/* COLUMNA IZQUIERDA - Visual (Hidden en móviles) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-gray-100 to-gray-50 flex-col items-center justify-center p-8 relative overflow-hidden">
-        {/* Imagen con desvanecimiento - Placeholder */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-white/30">
-          {/* Aquí irá la imagen de la madre cuando esté disponible */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-gray-400">
-              {/* Placeholder para imagen */}
-              <div className="w-full h-full bg-gradient-to-t from-gray-200 to-transparent flex items-center justify-center">
-                <span className="text-sm">Imagen de madre (por disponibilizar)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Logo y Título - Elevados sobre la imagen */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-[#FDF8FA] to-gray-50 flex-col items-center justify-center p-8 relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-center gap-3 text-center">
           <img
             src="/logo.png"
