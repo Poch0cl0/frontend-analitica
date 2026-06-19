@@ -389,6 +389,13 @@ export const PredictionPanel: React.FC = () => {
     return 'Sin consultas previas';
   };
 
+  // MAPEO DE COLORES DE RIESGO SEGUN PORCENTAJE
+  const getRiskColor = (percentage: number) => {
+    if (percentage < 30) return '#16A34A'; // Verde
+    if (percentage < 70) return '#D97706'; // Amarillo/Ámbar
+    return '#BA1A1A'; // Rojo
+  };
+
   // MAPEO DE COLORES DE RIESGO INSTITUCIONALES (Según Figma y specs/core-app.json)
   const getRiskStyles = (nivel: string | null | undefined) => {
     const safeNivel = nivel?.toLowerCase() || 'bajo';
@@ -603,7 +610,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.random_forest.prob_prematuro * 100)}
-                      strokeColor="#612853"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.random_forest.prob_prematuro * 100))}
                     />
                   </div>
 
@@ -673,7 +680,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.catboost.prob_prematuro * 100)}
-                      strokeColor="#F59E0B"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.catboost.prob_prematuro * 100))}
                     />
                   </div>
 
@@ -708,8 +715,7 @@ export const PredictionPanel: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-extrabold text-slate-800 text-base">SVM Lineal</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Support Vector Machine</p>
+                      <h3 className="font-extrabold text-slate-800 text-base">Regresion Logistica</h3>
                     </div>
                     <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
                   </div>
@@ -717,7 +723,7 @@ export const PredictionPanel: React.FC = () => {
                   <div className="flex justify-center py-2">
                     <CircularProgress
                       percentage={Math.round(prediction.modelos!.svm.prob_prematuro * 100)}
-                      strokeColor="#BA1A1A"
+                      strokeColor={getRiskColor(Math.round(prediction.modelos!.svm.prob_prematuro * 100))}
                     />
                   </div>
 
@@ -824,11 +830,11 @@ export const PredictionPanel: React.FC = () => {
           <RefreshCw className={`w-4 h-4 text-[#612853] ${calculating ? 'animate-spin' : ''}`} /> Guardar/Actualizar Predicción
         </button>
         <button
-          onClick={() => navigate('/recomendaciones')}
+          onClick={() => navigate('/triaje')}
           className="w-full sm:w-auto px-6 py-2.5 text-white text-xs font-bold rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2 shadow-md"
           style={{ backgroundColor: '#612853' }}
         >
-          Ir a Recomendaciones <ArrowRight className="w-4 h-4" />
+          Ir a Triaje <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 
