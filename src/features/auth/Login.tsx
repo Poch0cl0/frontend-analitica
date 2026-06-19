@@ -152,26 +152,15 @@ export default function Login() {
 
         {/* Logo y Título - Elevados sobre la imagen */}
         <div className="relative z-10 flex flex-col items-center gap-3 text-center">
-          {/* Logo placeholder */}
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
-            <svg
-              className="w-8 h-8"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              />
-            </svg>
-          </div>
+          <img
+            src="/logo.png"
+            alt="Obstetricare"
+            className="w-16 h-16 object-contain drop-shadow-lg"
+          />
 
           {/* Título con color secundario */}
           <div className="flex items-center gap-2">
-            <h1 className="text-4xl font-bold text-gray-900">ObstetriCare</h1>
+            <h1 className="text-4xl font-bold text-gray-900">Obstetricare</h1>
             <span
               className="inline-block w-1 h-10 rounded-full"
               style={{ backgroundColor: '#CE7E9D' }}
@@ -190,10 +179,9 @@ export default function Login() {
           {/* Bienvenida */}
           <div className="mb-8">
             {/* Logo para mobile */}
-            <div className="lg:hidden flex justify-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Obstetri<span style={{ color: '#CE7E9D' }}>Care</span>
-              </h1>
+            <div className="lg:hidden flex flex-col items-center gap-2 mb-6">
+              <img src="/logo.png" alt="Obstetricare" className="w-12 h-12 object-contain" />
+              <h1 className="text-3xl font-bold text-gray-900">Obstetricare</h1>
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 text-center">

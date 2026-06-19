@@ -158,15 +158,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       <div className="h-20 flex items-center gap-3 px-5 flex-shrink-0">
         <img
           src="/logo.png"
-          alt="ObstetriCare Logo"
+          alt="Obstetricare"
           className="w-10 h-10 object-contain"
-          onError={(e) => {
-            const target = e.currentTarget as HTMLImageElement;
-            target.style.display = 'none';
-          }}
         />
         <div>
-          <span className="text-lg font-bold text-white tracking-tight">ObstetriCare</span>
+          <span className="text-lg font-bold text-white tracking-tight">Obstetricare</span>
           <span className="block text-[10px] text-white/60 font-medium -mt-0.5">Maternal-Fetal Medicine</span>
         </div>
       </div>

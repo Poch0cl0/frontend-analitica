@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 import {
   api,
   getDashboardResumen,
@@ -14,6 +14,8 @@ import {
   getPacientes,
   createPaciente,
   getTriajeResumen,
+  createDatosClinicos,
+  updateDatosClinicos,
 } from '../../services/api';
 import type {
   DashboardResumen,
@@ -25,6 +27,14 @@ import type {
   CitaUpdate,
   TriajeResumen,
 } from '../../services/api';
+import {
+  DcAtenderFormView,
+  atenderFormToPayload,
+  emptyAtenderForm,
+  type DcAtenderForm,
+} from '../../components/DatosClinicosAtenderForm';
+import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
+import type { DatosClinicosResponse } from '../../services/api';
 
 // ==================== TIPOS ADICIONALES ====================
 
@@ -57,6 +67,7 @@ interface PacientePerfilResponse {
 
 export default function DashboardOverview() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isDoctor = localStorage.getItem('user_role') === 'medico';
 
   // Estados del Dashboard
@@ -78,12 +89,18 @@ export default function DashboardOverview() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Modales
-  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'detail' | 'delete' | 'patientsWithoutAppointment' | 'registerPatient' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'detail' | 'delete' | 'patientsWithoutAppointment' | 'registerPatient' | 'atender' | null>(null);
   const [selectedCitaId, setSelectedCitaId] = useState<number | null>(null);
   const [selectedCitaDetail, setSelectedCitaDetail] = useState<CitaResponseEnriquecida | null>(null);
   const [selectedPatientPerfil, setSelectedPatientPerfil] = useState<PacientePerfilResponse | null>(null);
   const [isLoadingPerfil, setIsLoadingPerfil] = useState<boolean>(false);
   const [preselectedPatientId, setPreselectedPatientId] = useState<number | null>(null);
+
+  // Atender cita (médico)
+  const [atenderDcForm, setAtenderDcForm] = useState<DcAtenderForm>(emptyAtenderForm);
+  const [existingDc, setExistingDc] = useState<DatosClinicosResponse | null>(null);
+  const [dcExists, setDcExists] = useState(false);
+  const [isSavingAtender, setIsSavingAtender] = useState(false);
 
   // Estados de los Formularios
   // 1. Registro Rápido de Paciente
@@ -433,8 +450,7 @@ export default function DashboardOverview() {
     try {
       await changeCitaEstado(selectedCitaId, 'en_atencion');
       showToastMsg('Consulta iniciada. El estado de la cita ha cambiado a "En atención"', 'success');
-      
-      // Actualizar modal y vista local
+
       const updatedCita = { ...selectedCitaDetail, estado: 'en_atencion' as const };
       setSelectedCitaDetail(updatedCita);
       await loadData(false);
@@ -445,19 +461,60 @@ export default function DashboardOverview() {
     }
   };
 
-  const handleFinalizarConsulta = async () => {
-    if (!selectedCitaId || !selectedCitaDetail) return;
+  const loadAtenderForm = async (cita: CitaResponseEnriquecida) => {
+    setSelectedCitaId(cita.id);
+    setSelectedCitaDetail(cita);
+    const loaded = await loadAtenderFormForPaciente(cita.paciente_id);
+    setAtenderDcForm(loaded.form);
+    setDcExists(loaded.dcExists);
+    setExistingDc(loaded.existingDc);
+  };
+
+  const handleOpenAtender = async (cita: CitaResponseEnriquecida) => {
+    await loadAtenderForm(cita);
+    setActiveModal('atender');
+  };
+
+  const handleAtenderFromDetail = async () => {
+    if (!selectedCitaDetail) return;
+    let cita = selectedCitaDetail;
+    if (cita.estado === 'programada') {
+      try {
+        await changeCitaEstado(cita.id, 'en_atencion');
+        cita = { ...cita, estado: 'en_atencion' };
+        setSelectedCitaDetail(cita);
+      } catch (err: any) {
+        showToastMsg(err.response?.data?.detail || 'No se pudo iniciar la consulta', 'error');
+        return;
+      }
+    }
+    await loadAtenderForm(cita);
+    setActiveModal('atender');
+  };
+
+  const handleAtender = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedCitaDetail) return;
+    setIsSavingAtender(true);
     try {
-      await changeCitaEstado(selectedCitaId, 'cumplida');
-      showToastMsg('Consulta finalizada con éxito. Se ha marcado como "Cumplida"', 'success');
-      
-      const updatedCita = { ...selectedCitaDetail, estado: 'cumplida' as const };
-      setSelectedCitaDetail(updatedCita);
+      const payload = atenderFormToPayload(atenderDcForm, existingDc);
+      if (dcExists) {
+        await updateDatosClinicos(selectedCitaDetail.paciente_id, payload);
+      } else {
+        await createDatosClinicos(selectedCitaDetail.paciente_id, payload);
+        setDcExists(true);
+      }
+      await changeCitaEstado(selectedCitaDetail.id, 'cumplida');
+      showToastMsg('Cita atendida y datos clínicos guardados correctamente', 'success');
+      setActiveModal(null);
+      setSelectedCitaDetail(null);
+      setSelectedCitaId(null);
       await loadData(false);
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.detail || 'No se pudo cambiar el estado de la cita.';
-      showToastMsg(msg, 'error');
+      showToastMsg(err?.response?.data?.detail || 'Error al atender la cita', 'error');
+    } finally {
+      setIsSavingAtender(false);
     }
   };
 
@@ -751,6 +808,7 @@ export default function DashboardOverview() {
                 </div>
                 <h3 className="font-bold text-gray-700">No hay citas programadas</h3>
                 <p className="text-sm text-gray-400 mt-1 max-w-xs">No se encontraron citas médicas programadas para la fecha de hoy.</p>
+                {!isDoctor && (
                 <button 
                   onClick={() => handleOpenCreateModal()}
                   className="mt-4 px-4 py-2 text-xs font-bold text-white rounded-lg hover:opacity-90"
@@ -758,6 +816,7 @@ export default function DashboardOverview() {
                 >
                   Programar primera cita
                 </button>
+                )}
               </div>
             ) : (
               <table className="w-full text-left border-collapse">
@@ -810,26 +869,48 @@ export default function DashboardOverview() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => handleOpenEditModal(cita)}
-                            title="Editar cita"
-                            disabled={cita.estado === 'cumplida' || cita.estado === 'cancelada'}
-                            className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200 disabled:opacity-30 disabled:pointer-events-none"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleOpenDeleteModal(cita.id)}
-                            title="Cancelar cita"
-                            disabled={cita.estado === 'cumplida' || cita.estado === 'cancelada'}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 disabled:opacity-30 disabled:pointer-events-none"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {isDoctor ? (
+                            (cita.estado === 'programada' || cita.estado === 'en_atencion') ? (
+                              <button
+                                onClick={() => handleOpenAtender(cita)}
+                                title="Atender cita y registrar datos clínicos"
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
+                                style={{ backgroundColor: '#F5EDF2', color: '#612853', borderColor: '#E8D5EF' }}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Atender</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic px-2">
+                                {cita.estado === 'cumplida' ? 'Atendida' : 'Cancelada'}
+                              </span>
+                            )
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditModal(cita)}
+                                title="Editar cita"
+                                disabled={cita.estado === 'cumplida' || cita.estado === 'cancelada'}
+                                className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200 disabled:opacity-30 disabled:pointer-events-none"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleOpenDeleteModal(cita.id)}
+                                title="Cancelar cita"
+                                disabled={cita.estado === 'cumplida' || cita.estado === 'cancelada'}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 disabled:opacity-30 disabled:pointer-events-none"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -917,9 +998,15 @@ export default function DashboardOverview() {
                 ) : (
                   <ul className="space-y-2 max-h-40 overflow-y-auto">
                     {citasHoy.filter(c => c.estado === 'programada' || c.estado === 'en_atencion').map(c => (
-                      <li key={c.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-2 border border-gray-100">
-                        <span className="font-semibold text-gray-800 truncate">{c.paciente_nombre}</span>
-                        <span className="text-gray-400 font-mono ml-2 flex-shrink-0">{formatHour(c.fecha_hora)}</span>
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDetailModal(c.id)}
+                          className="w-full flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-2 border border-gray-100 hover:bg-slate-100 transition-colors text-left"
+                        >
+                          <span className="font-semibold text-gray-800 truncate">{c.paciente_nombre}</span>
+                          <span className="text-gray-400 font-mono ml-2 flex-shrink-0">{formatHour(c.fecha_hora)}</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1322,8 +1409,14 @@ export default function DashboardOverview() {
 
       {/* ==================== MODAL: DETALLE CITA Y HISTORIAL CLÍNICO ==================== */}
       {activeModal === 'detail' && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
+          onClick={() => setActiveModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in"
+            onClick={e => e.stopPropagation()}
+          >
             
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#612853' }}>
@@ -1504,44 +1597,69 @@ export default function DashboardOverview() {
 
                 {/* Footer del Modal: Acciones de Consulta */}
                 <div className="pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                  
-                  {/* Botón destacada: Iniciar Consulta */}
-                  {selectedCitaDetail?.estado === 'programada' ? (
-                    <button
-                      onClick={handleIniciarConsulta}
-                      className="py-2.5 px-6 rounded-xl text-sm font-extrabold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm active:scale-95 transition-all duration-150"
-                      style={{ backgroundColor: '#612853' }}
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>Iniciar Consulta Médica</span>
-                    </button>
-                  ) : selectedCitaDetail?.estado === 'en_atencion' ? (
-                    <button
-                      onClick={handleFinalizarConsulta}
-                      className="py-2.5 px-6 rounded-xl text-sm font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2 hover:opacity-95 shadow-sm active:scale-95 transition-all duration-150"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Finalizar Consulta Médica</span>
-                    </button>
+
+                  {isDoctor ? (
+                    (selectedCitaDetail?.estado === 'programada' || selectedCitaDetail?.estado === 'en_atencion') ? (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        {selectedCitaDetail?.estado === 'programada' && (
+                          <button
+                            onClick={handleIniciarConsulta}
+                            className="py-2.5 px-5 rounded-xl text-sm font-bold text-gray-700 border border-gray-200 hover:bg-gray-50 flex items-center justify-center gap-2"
+                          >
+                            Iniciar consulta
+                          </button>
+                        )}
+                        <button
+                          onClick={handleAtenderFromDetail}
+                          className="py-2.5 px-6 rounded-xl text-sm font-extrabold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm active:scale-95 transition-all duration-150"
+                          style={{ backgroundColor: '#612853' }}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Atender y registrar datos clínicos</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                        <span>✓ Esta cita médica ya concluyó</span>
+                      </div>
+                    )
                   ) : (
-                    <div className="text-xs text-gray-500 font-bold flex items-center gap-1">
-                      <span>✓ Esta cita médica ya concluyó</span>
-                    </div>
+                    <>
+                      {selectedCitaDetail?.estado === 'programada' ? (
+                        <button
+                          onClick={handleIniciarConsulta}
+                          className="py-2.5 px-6 rounded-xl text-sm font-extrabold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm active:scale-95 transition-all duration-150"
+                          style={{ backgroundColor: '#612853' }}
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Iniciar Consulta Médica</span>
+                        </button>
+                      ) : selectedCitaDetail?.estado === 'en_atencion' ? (
+                        <div className="text-xs text-purple-700 font-bold flex items-center gap-1">
+                          <span>Consulta en curso</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                          <span>✓ Esta cita médica ya concluyó</span>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="flex items-center gap-2 justify-end">
-                    {/* Botón: Ver historial clínico completo */}
-                    <button
-                      onClick={() => showToastMsg('Visualizando expediente clínico completo en la pestaña Pacientes...', 'success')}
-                      className="py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-150 border border-gray-200 bg-white"
-                    >
-                      Ver historial clínico completo
-                    </button>
+                    {selectedCitaDetail && (
+                      <button
+                        onClick={() => navigate(`/pacientes/${selectedCitaDetail.paciente_id}`, { state: { initialTab: 'clinico' } })}
+                        className="py-2.5 px-4 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-150 border border-gray-200 bg-white"
+                      >
+                        Ver expediente completo
+                      </button>
+                    )}
                     <button
                       onClick={() => setActiveModal(null)}
                       className="py-2.5 px-4 rounded-xl text-xs font-semibold text-gray-500 hover:text-gray-700"
@@ -1555,6 +1673,66 @@ export default function DashboardOverview() {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: ATENDER CITA (MÉDICO) ==================== */}
+      {activeModal === 'atender' && selectedCitaDetail && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
+             onClick={() => setActiveModal(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
+               onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F5EDF2' }}>
+                  <svg className="w-5 h-5" style={{ color: '#612853' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">Atender Cita</h2>
+                  <p className="text-xs text-gray-500">
+                    {selectedCitaDetail.paciente_nombre} · {selectedCitaDetail.motivo} · {formatHour(selectedCitaDetail.fecha_hora)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mx-6 mt-5 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2.5">
+              <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                Registra o actualiza los datos clínicos de la paciente. Al guardar, la cita quedará marcada automáticamente como <strong>Atendida</strong>.
+              </p>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-6">
+              <form onSubmit={handleAtender}>
+                <DcAtenderFormView
+                  form={atenderDcForm}
+                  onChange={setAtenderDcForm}
+                />
+                <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+                  <button type="button" onClick={() => setActiveModal(null)}
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold border-2 text-gray-700 hover:bg-gray-50"
+                    style={{ borderColor: '#E8D5EF' }}>
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={isSavingAtender}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 shadow-sm"
+                    style={{ backgroundColor: '#612853' }}>
+                    {isSavingAtender ? 'Guardando...' : 'Guardar datos y marcar como Atendida'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

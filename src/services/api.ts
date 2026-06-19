@@ -78,6 +78,7 @@ export interface CitaResponse {
 
 export interface CitaResponseEnriquecida extends CitaResponse {
   paciente_nombre: string | null;
+  paciente_dni?: string | null;
   medico_nombre: string | null;
   semanas_gestacion: number | null;
   nivel_riesgo: string | null;
@@ -416,4 +417,39 @@ export const getTriajePriorizados = async (
   if (nivel) params.nivel = nivel;
   const response = await api.get<TriajePriorizadoItem[]>('/api/triage/priorizados', { params });
   return response.data;
-};
+};
+
+export const sincronizarTriaje = async (): Promise<{ procesados: number }> => {
+  const response = await api.post<{ procesados: number }>('/api/triage/sincronizar');
+  return response.data;
+};
+
+// ==================== RECOMENDACIONES ====================
+
+export interface RecomendacionResponse {
+  id: number;
+  paciente_id: number;
+  prediccion_id: number | null;
+  algoritmo: string;
+  prioridad: number | null;
+  confianza: number | null;
+  estado: string;
+  titulo: string | null;
+  descripcion: string | null;
+  notas: string | null;
+  fecha_revision: string | null;
+  es_manual: boolean;
+  origen: string;
+  fecha_recomendacion: string;
+  intervencion: {
+    id: number;
+    codigo: string;
+    nombre: string;
+    categoria: string | null;
+  };
+}
+
+export const getRecomendacionesPaciente = async (pacienteId: number): Promise<RecomendacionResponse[]> => {
+  const response = await api.get<RecomendacionResponse[]>(`/api/recomendaciones/paciente/${pacienteId}`);
+  return response.data;
+};

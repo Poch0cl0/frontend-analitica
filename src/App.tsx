@@ -9,6 +9,7 @@ import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import { NavProvider } from './contexts/NavContext';
 import { PredictionPanel } from './features/risk-calculator/PredictionPanel';
 import TriajePage from './features/triaje/TriajePage';
+import RecomendacionesPacientePage from './features/recomendaciones/RecomendacionesPacientePage';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
 const ADMIN_ROLES = ['administrador'];
@@ -84,6 +85,12 @@ function App() {
             <Route path="/triaje" element={
               <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
                 <SidebarLayout><TriajePage /></SidebarLayout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/recomendaciones/:pacienteId" element={
+              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+                <SidebarLayout><RecomendacionesPacientePage /></SidebarLayout>
               </ProtectedRoute>
             } />
 

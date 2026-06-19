@@ -23,8 +23,15 @@ import type {
   CitaCreate,
   CitaUpdate,
   DatosClinicosResponse,
-  DatosClinicosInput,
 } from '../../services/api';
+import {
+  DcAtenderFormView,
+  atenderFormFromResponse,
+  atenderFormToPayload,
+  emptyAtenderForm,
+  type DcAtenderForm,
+} from '../../components/DatosClinicosAtenderForm';
+import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 
 const PRIMARY = '#612853';
 
@@ -73,279 +80,6 @@ const TIPO_CITA_OPTIONS = [
   { value: 'Urgencia Prenatal', label: 'Control Urgente por Riesgo' },
   { value: 'Consulta Especialidad', label: 'Evaluación de Especialidad (Alto Riesgo)' },
 ];
-
-const BMI_CATEGORIAS = [
-  { value: '', label: '— Sin calcular —' },
-  { value: 'bajo_peso', label: 'Bajo Peso (<18.5)' },
-  { value: 'normal', label: 'Normal (18.5–24.9)' },
-  { value: 'sobrepeso', label: 'Sobrepeso (25–29.9)' },
-  { value: 'obesidad_I', label: 'Obesidad I (30–34.9)' },
-  { value: 'obesidad_II', label: 'Obesidad II (35–39.9)' },
-  { value: 'obesidad_III', label: 'Obesidad III (≥40)' },
-];
-
-// ── Datos Clínicos form state ─────────────────────────────────────────────────
-interface DcForm {
-  edad_gestacional_semanas: string;
-  longitud_cervical_mm: string;
-  embarazo_multiple: boolean;
-  parto_prematuro_previo: boolean;
-  hipertension_gestacional: boolean;
-  bmi: string;
-  bmi_categoria: string;
-  num_condiciones_cronicas: string;
-  infeccion_activa: boolean;
-  diabetes_pregestacional: boolean;
-  diabetes_gestacional: boolean;
-  hipertension_cronica: boolean;
-  eclampsia: boolean;
-  hepatitis_b: boolean;
-  hepatitis_c: boolean;
-  sifilis: boolean;
-  clamidia: boolean;
-  gonorrea: boolean;
-  cesareas_previas: boolean;
-  num_cesareas: string;
-  num_partos_previos_vivos: string;
-  alerta_activa: boolean;
-  notas_medicas: string;
-}
-
-const emptyDcForm: DcForm = {
-  edad_gestacional_semanas: '', longitud_cervical_mm: '',
-  embarazo_multiple: false, parto_prematuro_previo: false,
-  hipertension_gestacional: false, bmi: '', bmi_categoria: '',
-  num_condiciones_cronicas: '0', infeccion_activa: false,
-  diabetes_pregestacional: false, diabetes_gestacional: false,
-  hipertension_cronica: false, eclampsia: false,
-  hepatitis_b: false, hepatitis_c: false, sifilis: false,
-  clamidia: false, gonorrea: false, cesareas_previas: false,
-  num_cesareas: '0', num_partos_previos_vivos: '0',
-  alerta_activa: false, notas_medicas: '',
-};
-
-function dcFromResponse(dc: DatosClinicosResponse): DcForm {
-  return {
-    edad_gestacional_semanas: dc.edad_gestacional_semanas !== null ? String(dc.edad_gestacional_semanas) : '',
-    longitud_cervical_mm: dc.longitud_cervical_mm !== null ? String(dc.longitud_cervical_mm) : '',
-    embarazo_multiple: dc.embarazo_multiple,
-    parto_prematuro_previo: dc.parto_prematuro_previo,
-    hipertension_gestacional: dc.hipertension_gestacional,
-    bmi: dc.bmi !== null ? String(dc.bmi) : '',
-    bmi_categoria: dc.bmi_categoria || '',
-    num_condiciones_cronicas: String(dc.num_condiciones_cronicas),
-    infeccion_activa: dc.infeccion_activa,
-    diabetes_pregestacional: dc.diabetes_pregestacional,
-    diabetes_gestacional: dc.diabetes_gestacional,
-    hipertension_cronica: dc.hipertension_cronica,
-    eclampsia: dc.eclampsia,
-    hepatitis_b: dc.hepatitis_b,
-    hepatitis_c: dc.hepatitis_c,
-    sifilis: dc.sifilis,
-    clamidia: dc.clamidia,
-    gonorrea: dc.gonorrea,
-    cesareas_previas: dc.cesareas_previas,
-    num_cesareas: String(dc.num_cesareas),
-    num_partos_previos_vivos: String(dc.num_partos_previos_vivos),
-    alerta_activa: dc.alerta_activa,
-    notas_medicas: dc.notas_medicas || '',
-  };
-}
-
-function dcToPayload(form: DcForm): DatosClinicosInput {
-  return {
-    edad_gestacional_semanas: form.edad_gestacional_semanas ? Number(form.edad_gestacional_semanas) : null,
-    longitud_cervical_mm: form.longitud_cervical_mm ? Number(form.longitud_cervical_mm) : null,
-    embarazo_multiple: form.embarazo_multiple,
-    parto_prematuro_previo: form.parto_prematuro_previo,
-    hipertension_gestacional: form.hipertension_gestacional,
-    bmi: form.bmi ? Number(form.bmi) : null,
-    bmi_categoria: form.bmi_categoria || null,
-    num_condiciones_cronicas: Number(form.num_condiciones_cronicas) || 0,
-    infeccion_activa: form.infeccion_activa,
-    diabetes_pregestacional: form.diabetes_pregestacional,
-    diabetes_gestacional: form.diabetes_gestacional,
-    hipertension_cronica: form.hipertension_cronica,
-    eclampsia: form.eclampsia,
-    hepatitis_b: form.hepatitis_b,
-    hepatitis_c: form.hepatitis_c,
-    sifilis: form.sifilis,
-    clamidia: form.clamidia,
-    gonorrea: form.gonorrea,
-    cesareas_previas: form.cesareas_previas,
-    num_cesareas: Number(form.num_cesareas) || 0,
-    num_partos_previos_vivos: Number(form.num_partos_previos_vivos) || 0,
-    alerta_activa: form.alerta_activa,
-    notas_medicas: form.notas_medicas || null,
-  };
-}
-
-// ── Toggle switch ─────────────────────────────────────────────────────────────
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button type="button" onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${checked ? '' : 'bg-gray-200'}`}
-      style={checked ? { backgroundColor: PRIMARY } : {}}>
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-1'}`} />
-    </button>
-  );
-}
-
-// ── Datos Clínicos Form (inline dentro del tab o modal atender) ───────────────
-interface DcFormViewProps {
-  form: DcForm;
-  onChange: (key: keyof DcForm, value: string | boolean) => void;
-}
-
-function DcFormView({ form, onChange }: DcFormViewProps) {
-  const inputCls = "w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all bg-white";
-  const borderNormal = '#E8D5EF';
-
-  const ToggleRow = ({ label, field }: { label: string; field: keyof DcForm }) => (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-      <span className="text-sm text-gray-700">{label}</span>
-      <Toggle checked={form[field] as boolean} onChange={v => onChange(field, v)} />
-    </div>
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Datos del embarazo */}
-      <div>
-        <div className="flex items-center gap-2 mb-4 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
-          <span className="text-sm font-bold text-gray-800">Datos del Embarazo</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Semanas de gestación</label>
-            <input type="number" min="20" max="45" value={form.edad_gestacional_semanas}
-              onChange={e => onChange('edad_gestacional_semanas', e.target.value)}
-              placeholder="20–45"
-              className={inputCls} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Longitud cervical (mm)</label>
-            <input type="number" min="0" step="0.1" value={form.longitud_cervical_mm}
-              onChange={e => onChange('longitud_cervical_mm', e.target.value)}
-              placeholder="Ej. 25.5"
-              className={inputCls} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">IMC (BMI)</label>
-            <input type="number" min="10" max="60" step="0.1" value={form.bmi}
-              onChange={e => onChange('bmi', e.target.value)}
-              placeholder="Ej. 24.5"
-              className={inputCls} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Categoría IMC</label>
-            <select value={form.bmi_categoria} onChange={e => onChange('bmi_categoria', e.target.value)}
-              className={`${inputCls}`} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}>
-              {BMI_CATEGORIAS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-0.5">
-          <ToggleRow label="Embarazo múltiple (gemelos, etc.)" field="embarazo_multiple" />
-          <ToggleRow label="Parto prematuro previo" field="parto_prematuro_previo" />
-        </div>
-      </div>
-
-      {/* Condiciones maternas */}
-      <div>
-        <div className="flex items-center gap-2 mb-3 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
-          <span className="text-sm font-bold text-gray-800">Condiciones Maternas</span>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 space-y-0.5">
-          <ToggleRow label="Hipertensión gestacional" field="hipertension_gestacional" />
-          <ToggleRow label="Hipertensión crónica" field="hipertension_cronica" />
-          <ToggleRow label="Diabetes pregestacional" field="diabetes_pregestacional" />
-          <ToggleRow label="Diabetes gestacional" field="diabetes_gestacional" />
-          <ToggleRow label="Eclampsia" field="eclampsia" />
-          <ToggleRow label="Infección activa" field="infeccion_activa" />
-          <ToggleRow label="Alerta activa" field="alerta_activa" />
-        </div>
-        <div className="mt-3">
-          <label className="block text-xs font-semibold text-gray-500 mb-1">N° condiciones crónicas</label>
-          <input type="number" min="0" max="20" value={form.num_condiciones_cronicas}
-            onChange={e => onChange('num_condiciones_cronicas', e.target.value)}
-            className={inputCls} style={{ borderColor: borderNormal }}
-            onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-            onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-          />
-        </div>
-      </div>
-
-      {/* Infecciones de transmisión */}
-      <div>
-        <div className="flex items-center gap-2 mb-3 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
-          <span className="text-sm font-bold text-gray-800">Infecciones de Transmisión Sexual</span>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 space-y-0.5">
-          <ToggleRow label="Hepatitis B" field="hepatitis_b" />
-          <ToggleRow label="Hepatitis C" field="hepatitis_c" />
-          <ToggleRow label="Sífilis" field="sifilis" />
-          <ToggleRow label="Clamidia" field="clamidia" />
-          <ToggleRow label="Gonorrea" field="gonorrea" />
-        </div>
-      </div>
-
-      {/* Historial obstétrico */}
-      <div>
-        <div className="flex items-center gap-2 mb-3 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
-          <span className="text-sm font-bold text-gray-800">Historial Obstétrico</span>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 mb-3">
-          <ToggleRow label="Cesáreas previas" field="cesareas_previas" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">N° de cesáreas</label>
-            <input type="number" min="0" max="10" value={form.num_cesareas}
-              onChange={e => onChange('num_cesareas', e.target.value)}
-              className={inputCls} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">N° partos previos vivos</label>
-            <input type="number" min="0" max="20" value={form.num_partos_previos_vivos}
-              onChange={e => onChange('num_partos_previos_vivos', e.target.value)}
-              className={inputCls} style={{ borderColor: borderNormal }}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Notas médicas */}
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 mb-1">Notas Médicas</label>
-        <textarea rows={3} value={form.notas_medicas}
-          onChange={e => onChange('notas_medicas', e.target.value)}
-          placeholder="Observaciones clínicas, seguimiento especial..."
-          className={`${inputCls} resize-none`} style={{ borderColor: borderNormal }}
-          onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-          onBlur={e => e.currentTarget.style.borderColor = borderNormal}
-        />
-      </div>
-    </div>
-  );
-}
 
 // ── CITA MODAL (solo secretaria) ──────────────────────────────────────────────
 interface CitaFormData {
@@ -495,7 +229,7 @@ export default function PacienteDetalle() {
   // Datos clínicos (solo médico/admin)
   const [datosClinicos, setDatosClinicos] = useState<DatosClinicosResponse | null>(null);
   const [dcExists, setDcExists] = useState(false);
-  const [dcForm, setDcForm] = useState<DcForm>(emptyDcForm);
+  const [dcForm, setDcForm] = useState<DcAtenderForm>(emptyAtenderForm);
   const [isSavingDc, setIsSavingDc] = useState(false);
 
   // Edit patient modal (secretaria)
@@ -516,7 +250,8 @@ export default function PacienteDetalle() {
 
   // Atender cita modal (médico)
   const [atenderCita, setAtenderCita] = useState<CitaResponseEnriquecida | null>(null);
-  const [atenderDcForm, setAtenderDcForm] = useState<DcForm>(emptyDcForm);
+  const [atenderDcForm, setAtenderDcForm] = useState<DcAtenderForm>(emptyAtenderForm);
+  const [atenderExistingDc, setAtenderExistingDc] = useState<DatosClinicosResponse | null>(null);
   const [isSavingAtender, setIsSavingAtender] = useState(false);
 
   const medicoMap: Record<number, MedicoResumen> = {};
@@ -549,11 +284,11 @@ export default function PacienteDetalle() {
             const dc = await getDatosClinicos(Number(id));
             setDatosClinicos(dc);
             setDcExists(true);
-            setDcForm(dcFromResponse(dc));
+            setDcForm(atenderFormFromResponse(dc, calcEdad(pac.fecha_nacimiento)));
           } catch (err: any) {
             if (err?.response?.status === 404) {
               setDcExists(false);
-              setDcForm(emptyDcForm);
+              setDcForm(emptyAtenderForm);
             }
           }
         }
@@ -584,7 +319,7 @@ export default function PacienteDetalle() {
     if (!paciente) return;
     setIsSavingDc(true);
     try {
-      const payload = dcToPayload(dcForm);
+      const payload = atenderFormToPayload(dcForm, datosClinicos);
       let saved: DatosClinicosResponse;
       if (dcExists) {
         saved = await updateDatosClinicos(paciente.id, payload);
@@ -593,7 +328,7 @@ export default function PacienteDetalle() {
         setDcExists(true);
       }
       setDatosClinicos(saved);
-      setDcForm(dcFromResponse(saved));
+      setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
       showToast('Datos clínicos guardados correctamente', 'success');
     } catch (err: any) {
       showToast(err?.response?.data?.detail || 'Error al guardar datos clínicos', 'error');
@@ -603,9 +338,18 @@ export default function PacienteDetalle() {
   };
 
   // ── ATENDER CITA (médico) ─────────────────────────────────────────────────
-  const handleOpenAtender = (cita: CitaResponseEnriquecida) => {
+  const handleOpenAtender = async (cita: CitaResponseEnriquecida) => {
     setAtenderCita(cita);
-    setAtenderDcForm(datosClinicos ? dcFromResponse(datosClinicos) : emptyDcForm);
+    const loaded = await loadAtenderFormForPaciente(cita.paciente_id);
+    setAtenderDcForm(loaded.form);
+    setAtenderExistingDc(loaded.existingDc);
+    if (loaded.dcExists && loaded.existingDc) {
+      setDatosClinicos(loaded.existingDc);
+      setDcExists(true);
+      if (paciente) {
+        setDcForm(atenderFormFromResponse(loaded.existingDc, calcEdad(paciente.fecha_nacimiento)));
+      }
+    }
   };
 
   const handleAtender = async (e: FormEvent) => {
@@ -613,16 +357,16 @@ export default function PacienteDetalle() {
     if (!atenderCita || !paciente) return;
     setIsSavingAtender(true);
     try {
-      const payload = dcToPayload(atenderDcForm);
+      const payload = atenderFormToPayload(atenderDcForm, atenderExistingDc);
       if (dcExists) {
         const saved = await updateDatosClinicos(paciente.id, payload);
         setDatosClinicos(saved);
-        setDcForm(dcFromResponse(saved));
+        setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
       } else {
         const saved = await createDatosClinicos(paciente.id, payload);
         setDatosClinicos(saved);
         setDcExists(true);
-        setDcForm(dcFromResponse(saved));
+        setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
       }
       await changeCitaEstado(atenderCita.id, 'cumplida');
       showToast('Cita marcada como atendida y datos clínicos guardados', 'success');
@@ -954,9 +698,13 @@ export default function PacienteDetalle() {
             )}
           </div>
           <form onSubmit={handleSaveDc} className="p-6">
-            <DcFormView form={dcForm} onChange={(key, value) => setDcForm(prev => ({ ...prev, [key]: value }))} />
+            <DcAtenderFormView form={dcForm} onChange={setDcForm} />
             <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
-              <button type="button" onClick={() => setDcForm(datosClinicos ? dcFromResponse(datosClinicos) : emptyDcForm)}
+              <button type="button" onClick={() => setDcForm(
+                datosClinicos && paciente
+                  ? atenderFormFromResponse(datosClinicos, calcEdad(paciente.fecha_nacimiento))
+                  : emptyAtenderForm,
+              )}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold border-2 text-gray-700 hover:bg-gray-50 transition-colors"
                 style={{ borderColor: '#E8D5EF' }}>
                 Descartar cambios
@@ -1286,9 +1034,9 @@ export default function PacienteDetalle() {
 
             <div className="overflow-y-auto flex-1 p-6">
               <form onSubmit={handleAtender}>
-                <DcFormView
+                <DcAtenderFormView
                   form={atenderDcForm}
-                  onChange={(key, value) => setAtenderDcForm(prev => ({ ...prev, [key]: value }))}
+                  onChange={setAtenderDcForm}
                 />
                 <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
                   <button type="button" onClick={() => setAtenderCita(null)}

@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTriajePriorizados } from '../../services/api';
+import { getTriajePriorizados, sincronizarTriaje } from '../../services/api';
 import type { TriajePriorizadoItem, TriajeAlgoritmo } from '../../services/api';
+import PacienteClinicoModal from './PacienteClinicoModal';
+import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
+import type { DcAtenderForm } from '../../components/DatosClinicosAtenderForm';
 
 const PRIMARY = '#612853';
 
 type NivelUrgencia = 'rojo' | 'naranja' | 'amarillo' | 'verde';
+type FiltroNivel = NivelUrgencia | 'todos';
 
 const NIVELES: { key: NivelUrgencia; label: string; sub: string; color: string; bg: string; border: string }[] = [
   { key: 'rojo', label: 'ROJO — CRÍTICO', sub: 'Requiere Atención Inmediata', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
@@ -51,11 +55,29 @@ function buildTags(p: TriajePriorizadoItem): string[] {
 export default function TriajePage() {
   const navigate = useNavigate();
   const [algoritmo, setAlgoritmo] = useState<TriajeAlgoritmo>('arbol');
-  const [nivelActivo, setNivelActivo] = useState<NivelUrgencia>('rojo');
+  const [nivelActivo, setNivelActivo] = useState<FiltroNivel>('todos');
   const [todos, setTodos] = useState<TriajePriorizadoItem[]>([]);
   const [filtrados, setFiltrados] = useState<TriajePriorizadoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [clinicoModal, setClinicoModal] = useState<{
+    nombre: string;
+    dni: string;
+    form: DcAtenderForm | null;
+    loading: boolean;
+  } | null>(null);
+
+  const handleVerClinicos = async (p: TriajePriorizadoItem) => {
+    setClinicoModal({ nombre: `${p.nombre} ${p.apellidos}`, dni: p.dni, form: null, loading: true });
+    const loaded = await loadAtenderFormForPaciente(p.paciente_id);
+    setClinicoModal({
+      nombre: `${p.nombre} ${p.apellidos}`,
+      dni: p.dni,
+      form: loaded.form,
+      loading: false,
+    });
+  };
 
   const conteos: Record<NivelUrgencia, number> = {
     rojo: todos.filter(p => p.nivel_urgencia.toLowerCase() === 'rojo').length,
@@ -66,6 +88,7 @@ export default function TriajePage() {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    setSyncMsg(null);
     try {
       const data = await getTriajePriorizados(undefined, algoritmo);
       setTodos(data);
@@ -77,13 +100,37 @@ export default function TriajePage() {
     }
   }, [algoritmo]);
 
+  const handleActualizar = useCallback(async () => {
+    setIsLoading(true);
+    setSyncMsg(null);
+    try {
+      const { procesados } = await sincronizarTriaje();
+      const data = await getTriajePriorizados(undefined, algoritmo);
+      setTodos(data);
+      setLastUpdate(new Date());
+      if (procesados > 0) {
+        setSyncMsg(`Se enviaron ${procesados} paciente(s) a triaje.`);
+      }
+    } catch {
+      setTodos([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [algoritmo]);
+
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    setFiltrados(todos.filter(p => p.nivel_urgencia.toLowerCase() === nivelActivo));
+    setFiltrados(
+      nivelActivo === 'todos'
+        ? todos
+        : todos.filter(p => p.nivel_urgencia.toLowerCase() === nivelActivo),
+    );
   }, [todos, nivelActivo]);
 
-  const nivelCfg = getNivelConfig(nivelActivo);
+  const nivelCfg = nivelActivo === 'todos'
+    ? { key: 'todos' as const, label: 'TODOS LOS NIVELES', sub: 'Todos los pacientes con triaje', color: PRIMARY, bg: '#FDF8FA', border: '#E5E7EB' }
+    : getNivelConfig(nivelActivo);
   const minsAgo = Math.floor((Date.now() - lastUpdate.getTime()) / 60000);
 
   return (
@@ -98,7 +145,7 @@ export default function TriajePage() {
             Pacientes con predicción de riesgo registrada · última actualización: hace {minsAgo < 1 ? 'un momento' : `${minsAgo} min`}
           </p>
         </div>
-        <button onClick={loadData} disabled={isLoading}
+        <button onClick={handleActualizar} disabled={isLoading}
           className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 shadow-sm self-start"
           style={{ backgroundColor: PRIMARY }}>
           <svg className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -107,6 +154,12 @@ export default function TriajePage() {
           Actualizar Triaje
         </button>
       </div>
+
+      {syncMsg && (
+        <div className="rounded-xl px-4 py-2.5 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200">
+          {syncMsg}
+        </div>
+      )}
 
       {/* SELECTOR DE ALGORITMO */}
       <div className="flex flex-wrap gap-2">
@@ -124,7 +177,23 @@ export default function TriajePage() {
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <button onClick={() => setNivelActivo('todos')}
+          className={`text-left rounded-2xl p-4 border-2 transition-all ${
+            nivelActivo === 'todos' ? 'shadow-md scale-[1.02]' : 'shadow-sm hover:shadow-md'
+          }`}
+          style={{
+            backgroundColor: '#F9FAFB',
+            borderColor: nivelActivo === 'todos' ? PRIMARY : '#E5E7EB',
+          }}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: PRIMARY }} />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">todos</span>
+          </div>
+          <p className="text-xs font-semibold text-gray-700">Todos los niveles</p>
+          <p className="text-3xl font-extrabold mt-1 text-gray-900">{todos.length}</p>
+          <p className="text-[10px] text-gray-500 font-medium mt-0.5">pacientes</p>
+        </button>
         {NIVELES.map(n => (
           <button key={n.key} onClick={() => setNivelActivo(n.key)}
             className={`text-left rounded-2xl p-4 border-2 transition-all ${
@@ -167,8 +236,14 @@ export default function TriajePage() {
         </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-          <p className="text-gray-500 font-medium">No hay pacientes en nivel {nivelCfg.label} con este algoritmo.</p>
-          <p className="text-xs text-gray-400 mt-1">Solo aparecen pacientes que ya tienen predicción y triaje registrados.</p>
+          <p className="text-gray-500 font-medium">
+            {nivelActivo === 'todos'
+              ? 'No hay pacientes en triaje todavía.'
+              : `No hay pacientes en nivel ${nivelCfg.label} con este algoritmo.`}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Los pacientes con predicción aparecen automáticamente. Use &quot;Actualizar Triaje&quot; para enviar a triaje a todos los elegibles.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -244,20 +319,17 @@ export default function TriajePage() {
 
                 {/* Acciones */}
                 <div className="flex md:flex-col items-center justify-center gap-2 p-4 border-t md:border-t-0 md:border-l border-gray-100 flex-shrink-0">
-                  <button onClick={() => navigate(`/pacientes/${p.paciente_id}`, { state: { initialTab: 'citas' } })}
+                  <button
+                    onClick={() => navigate(`/recomendaciones/${p.paciente_id}`)}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 shadow-sm"
-                    style={{ backgroundColor: cfg.color }}>
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Atender
+                    style={{ backgroundColor: cfg.color }}
+                  >
+                    Ver recomendaciones
                   </button>
-                  <button onClick={() => navigate(`/pacientes/${p.paciente_id}`)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
+                  <button
+                    onClick={() => handleVerClinicos(p)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  >
                     Ver
                   </button>
                 </div>
@@ -265,6 +337,15 @@ export default function TriajePage() {
             );
           })}
         </div>
+      )}
+      {clinicoModal && (
+        <PacienteClinicoModal
+          pacienteNombre={clinicoModal.nombre}
+          pacienteDni={clinicoModal.dni}
+          form={clinicoModal.form}
+          isLoading={clinicoModal.loading}
+          onClose={() => setClinicoModal(null)}
+        />
       )}
     </div>
   );
