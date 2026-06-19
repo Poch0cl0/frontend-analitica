@@ -9,6 +9,7 @@ import { NavProvider } from './contexts/NavContext';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
 const ADMIN_ROLES = ['administrador'];
+import {PredictionPanel} from './features/risk-calculator/PredictionPanel';
 
 const UnderConstruction = ({ title }: { title: string }) => (
   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50">
@@ -58,6 +59,11 @@ function App() {
                 <SidebarLayout><DashboardOverview /></SidebarLayout>
               </ProtectedRoute>
             } />
+          <Route path="/prediccion" element={
+            <SidebarLayout>
+              <PredictionPanel />
+            </SidebarLayout>
+          } />
 
             {/* Módulo Pacientes */}
             <Route path="/pacientes" element={
