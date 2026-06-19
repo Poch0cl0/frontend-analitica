@@ -108,6 +108,7 @@ export default function Login() {
       // Guardar token en localStorage
       localStorage.setItem('access_token', access_token);
       localStorage.setItem('user_role', formData.role);
+      localStorage.setItem('user_email', formData.email);
 
       // Redirigir al dashboard
       navigate('/dashboard');

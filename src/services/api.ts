@@ -170,6 +170,51 @@ export const getPacientes = async (q?: string, page = 1, limit = 100): Promise<P
   return response.data;
 };
 
+export interface GetPacientesParams {
+  q?: string;
+  estado?: string;
+  medico_id?: number;
+  mes_registro?: number;
+  page?: number;
+  limit?: number;
+}
+
+export const getPacientesFiltered = async (params: GetPacientesParams = {}): Promise<PacienteListResponse> => {
+  const { q, estado, medico_id, mes_registro, page = 1, limit = 20 } = params;
+  const qp: Record<string, string | number> = { page, limit };
+  if (q) qp.q = q;
+  if (estado) qp.estado = estado;
+  if (medico_id) qp.medico_id = medico_id;
+  if (mes_registro) qp.mes_registro = mes_registro;
+  const response = await api.get<PacienteListResponse>('/api/pacientes/', { params: qp });
+  return response.data;
+};
+
+export const getPacienteById = async (id: number): Promise<PacienteResponse> => {
+  const response = await api.get<PacienteResponse>(`/api/pacientes/${id}`);
+  return response.data;
+};
+
+export interface PacienteUpdatePayload {
+  nombre?: string;
+  apellidos?: string;
+  fecha_nacimiento?: string;
+  telefono_principal?: string | null;
+  email?: string | null;
+  medico_asignado_id?: number | null;
+  activo?: boolean;
+}
+
+export const updatePaciente = async (id: number, data: PacienteUpdatePayload): Promise<PacienteResponse> => {
+  const response = await api.put<PacienteResponse>(`/api/pacientes/${id}`, data);
+  return response.data;
+};
+
+export const deletePaciente = async (id: number): Promise<PacienteResponse> => {
+  const response = await api.delete<PacienteResponse>(`/api/pacientes/${id}`);
+  return response.data;
+};
+
 export const createPaciente = async (data: PacienteCreate): Promise<PacienteResponse> => {
   const response = await api.post<PacienteResponse>('/api/pacientes/', data);
   return response.data;
