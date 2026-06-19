@@ -277,13 +277,13 @@ export const getPacientePerfil = async (pacienteId: number): Promise<PacientePer
   return response.data;
 };
 
-export const getUltimaPrediccion = async (pacienteId: number): Promise<PrediccionUltimaResponse> => {
-  const response = await api.get<PrediccionUltimaResponse>(`/api/prediccion/paciente/${pacienteId}/ultima`);
+export const ejecutarPrediccionConsenso = async (pacienteId: number): Promise<PrediccionConsensoResponse> => {
+  const response = await api.post<PrediccionConsensoResponse>(`/api/prediccion/consenso/${pacienteId}`);
   return response.data;
 };
 
-export const ejecutarPrediccionConsenso = async (pacienteId: number): Promise<PrediccionConsensoResponse> => {
-  const response = await api.post<PrediccionConsensoResponse>(`/api/prediccion/consenso/${pacienteId}`);
+export const getUltimaPrediccion = async (pacienteId: number): Promise<PrediccionUltimaResponse> => {
+  const response = await api.get<PrediccionUltimaResponse>(`/api/prediccion/paciente/${pacienteId}/ultima`);
   return response.data;
 };
 
@@ -544,4 +544,8 @@ export const enviarReportePaciente = async (
     { params: { tipo } },
   );
   return response.data;
+};
+
+export const ejecutarRecomendacionesS4 = async (pacienteId: number, prediccionId: number): Promise<void> => {
+  await api.post(`/api/recomendaciones/ejecutar/${pacienteId}/${prediccionId}`);
 };

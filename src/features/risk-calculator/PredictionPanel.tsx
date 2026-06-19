@@ -15,20 +15,20 @@ import type {
   PrediccionHistorialItem,
 } from '../../services/api';
 import {
-  ClipboardList,
-  ChevronDown,
   Printer,
   Mail,
   ArrowRight,
   Search,
   AlertTriangle,
-  CheckCircle2,
   BrainCircuit,
   TrendingUp,
   Activity,
   RefreshCw,
   Info,
-  Calendar
+  Calendar,
+  ClipboardList,
+  ChevronDown,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface ClinicalVar {
@@ -218,7 +218,6 @@ export const PredictionPanel: React.FC = () => {
         const res = await getPacientes('', 1, 100);
         setPatients(res.items);
         if (res.items.length > 0) {
-          // Seleccionar el primer paciente por defecto
           setSelectedPacienteId(res.items[0].id);
         }
       } catch (err: any) {
@@ -240,7 +239,6 @@ export const PredictionPanel: React.FC = () => {
         setLoadingData(true);
         setError(null);
 
-        // Llamar en paralelo por perfil y última predicción
         const [perfRes, predRes, histRes] = await Promise.all([
           getPacientePerfil(selectedPacienteId),
           getUltimaPrediccion(selectedPacienteId),
@@ -283,7 +281,7 @@ export const PredictionPanel: React.FC = () => {
     }
   };
 
-  // Imprimir reporte clínico ocultando partes innecesarias
+  // Imprimir reporte clínico
   const handlePrint = () => {
     window.print();
   };
@@ -388,11 +386,6 @@ export const PredictionPanel: React.FC = () => {
     return vars;
   };
 
-  // Calcular variables clínicas mapeadas del perfil clínico
-  const clinicalVars = profile ? getClinicalVars(profile) : [];
-  const alertCount = clinicalVars.filter((v) => v.isAlert).length;
-  const totalCount = clinicalVars.length;
-
   // Formatear fecha de última consulta/predicción
   const getFormattedDate = () => {
     if (prediction?.fecha_prediccion) {
@@ -415,7 +408,7 @@ export const PredictionPanel: React.FC = () => {
     return '#BA1A1A'; // Rojo
   };
 
-  // MAPEO DE COLORES DE RIESGO INSTITUCIONALES (Según Figma y specs/core-app.json)
+  // MAPEO DE COLORES DE RIESGO INSTITUCIONALES
   const getRiskStyles = (nivel: string | null | undefined) => {
     const safeNivel = nivel?.toLowerCase() || 'bajo';
     switch (safeNivel) {
@@ -452,6 +445,9 @@ export const PredictionPanel: React.FC = () => {
   };
 
   const activeRiskStyle = getRiskStyles(prediction?.nivel_riesgo);
+  const clinicalVars = profile ? getClinicalVars(profile) : [];
+  const alertCount = clinicalVars.filter(v => v.isAlert).length;
+  const totalCount = clinicalVars.length;
 
   return (
     <div className="p-6 bg-slate-50/50 min-h-screen space-y-6 font-sans">
@@ -476,7 +472,7 @@ export const PredictionPanel: React.FC = () => {
                 onFocus={() => setShowDropdown(true)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#612853]/20 focus:border-[#612853] transition-all"
               />
-              <Search className="absolute left-3.5 top-3 w-4.5 h-4.5 text-slate-400" />
+              <Search className="absolute left-3.5 top-3 w-5 h-5 text-slate-400" />
               {searchQuery && (
                 <button
                   onClick={() => {
@@ -548,8 +544,15 @@ export const PredictionPanel: React.FC = () => {
           )}
         </div>
 
-        {/* Bloques a la derecha: Última consulta y Estado de Riesgo */}
-        <div className="flex items-center justify-between sm:justify-end gap-8 border-t border-slate-100 lg:border-t-0 pt-4 lg:pt-0">
+        {/* Bloques a la derecha: Acciones e Impresión */}
+        <div className="flex items-center justify-between sm:justify-end gap-6 border-t border-slate-100 lg:border-t-0 pt-4 lg:pt-0">
+          <button 
+            onClick={handlePrint}
+            className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition print:hidden"
+            title="Imprimir reporte"
+          >
+            <Printer className="w-5 h-5" />
+          </button>
           <div className="text-left sm:text-right">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Última Consulta</span>
             <span className="text-sm font-semibold text-slate-700 flex items-center sm:justify-end gap-1.5 mt-0.5">
@@ -598,7 +601,7 @@ export const PredictionPanel: React.FC = () => {
               <button
                 onClick={handleCalcularConsenso}
                 disabled={calculating}
-                className="px-6 py-3 bg-[#612853] hover:bg-[#522146] text-white text-xs font-bold rounded-xl transition duration-200 flex items-center gap-2 shadow-md disabled:opacity-55"
+                className="px-6 py-3 bg-[#612853] hover:bg-[#522146] text-white text-xs font-bold rounded-xl transition duration-200 flex items-center gap-2 shadow-md disabled:opacity-50"
               >
                 {calculating ? (
                   <>
@@ -613,176 +616,154 @@ export const PredictionPanel: React.FC = () => {
             </div>
           ) : (
             /* CONEXIÓN REAL - GRID DE MODELOS */
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Card 1: Random Forest */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-extrabold text-slate-800 text-base">Random Forest</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Modelo Ensemble</p>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* Card 1: Random Forest */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-base">Random Forest</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Modelo Ensemble</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
                     </div>
-                    <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
-                  </div>
 
-                  <div className="flex justify-center py-2">
-                    <CircularProgress
-                      percentage={Math.round(prediction.modelos!.random_forest.prob_prematuro * 100)}
-                      strokeColor={getRiskColor(Math.round(prediction.modelos!.random_forest.prob_prematuro * 100))}
-                    />
-                  </div>
+                    {prediction.modelos?.random_forest && (
+                      <div className="flex justify-center py-2">
+                        <CircularProgress
+                          percentage={Math.round(prediction.modelos.random_forest.prob_prematuro * 100)}
+                          strokeColor={getRiskColor(Math.round(prediction.modelos.random_forest.prob_prematuro * 100))}
+                        />
+                      </div>
+                    )}
 
-                  {/* Sección Interna: Importancia de Variables (Horizontal progress bars) */}
-                  <div className="space-y-3 pt-4 border-t border-slate-100">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Importancia de Variables (S-2)</span>
-                    <div className="space-y-2 text-[11px]">
-                      <div>
-                        <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
-                          <span>Longitud Cervical</span>
-                          <span>42%</span>
+                    <div className="space-y-3 pt-4 border-t border-slate-100">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Importancia de Variables (S-2)</span>
+                      <div className="space-y-2 text-[11px]">
+                        <div>
+                          <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
+                            <span>Longitud Cervical</span>
+                            <span>42%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: '42%', backgroundColor: '#612853' }} />
+                          </div>
                         </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: '42%', backgroundColor: '#612853' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
-                          <span>Partos Prematuros Previos</span>
-                          <span>28%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: '28%', backgroundColor: '#612853' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
-                          <span>Edad Gestacional</span>
-                          <span>18%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: '18%', backgroundColor: '#612853' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
-                          <span>Edad Materna</span>
-                          <span>12%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: '12%', backgroundColor: '#612853' }} />
+                        <div>
+                          <div className="flex justify-between text-slate-600 font-semibold mb-0.5">
+                            <span>Partos Prematuros Previos</span>
+                            <span>28%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: '28%', backgroundColor: '#612853' }} />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
+
+                  <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
+                    <p className="text-xs font-bold text-slate-500">
+                      Parto Estimado: <span className="text-[#612853] font-black">{prediction.modelos?.random_forest?.semanas_estimadas} semanas</span>
+                    </p>
+                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">IC 95%: {MODEL_METADATA.random_forest.ic95} | Margen: {MODEL_METADATA.random_forest.margen}</p>
+                  </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
-                  <p className="text-xs font-bold text-slate-500">
-                    Parto Estimado: <span className="text-[#612853] font-black">{prediction.modelos!.random_forest.semanas_estimadas} semanas</span>
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-medium mt-0.5">IC 95%: {MODEL_METADATA.random_forest.ic95} | Margen: {MODEL_METADATA.random_forest.margen}</p>
+                {/* Card 2: CatBoost */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-base">CatBoost</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gradient Boosting</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
+                    </div>
+
+                    {prediction.modelos?.catboost && (
+                      <div className="flex justify-center py-2">
+                        <CircularProgress
+                          percentage={Math.round(prediction.modelos.catboost.prob_prematuro * 100)}
+                          strokeColor={getRiskColor(Math.round(prediction.modelos.catboost.prob_prematuro * 100))}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Parámetros del Modelo</span>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-medium">Margen de Decisión:</span>
+                        <span className="font-bold text-slate-700">{MODEL_METADATA.catboost.margen}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-medium">Intervalo de Confianza:</span>
+                        <span className="font-bold text-slate-700">{MODEL_METADATA.catboost.ic95}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
+                    <p className="text-xs font-bold text-slate-500">
+                      Parto Estimado: <span className="text-amber-600 font-black">{prediction.modelos?.catboost?.semanas_estimadas} semanas</span>
+                    </p>
+                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Optimizador nativo simétrico .cbm</p>
+                  </div>
                 </div>
+
+                {/* Card 3: SVM / Regresión Logística */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-extrabold text-slate-800 text-base">Support Vector Machine</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Clasificador Lineal</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
+                    </div>
+
+                    {prediction.modelos?.svm && (
+                      <div className="flex justify-center py-2">
+                        <CircularProgress
+                          percentage={Math.round(prediction.modelos.svm.prob_prematuro * 100)}
+                          strokeColor={getRiskColor(Math.round(prediction.modelos.svm.prob_prematuro * 100))}
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Parámetros del Modelo</span>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-medium">Margen de Decisión:</span>
+                        <span className="font-bold text-slate-700">{MODEL_METADATA.svm.margen}</span>
+                      </div>
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-medium">Intervalo de Confianza:</span>
+                        <span className="font-bold text-slate-700">{MODEL_METADATA.svm.ic95}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
+                    <p className="text-xs font-bold text-slate-500">
+                      Parto Estimado: <span className="text-purple-600 font-black">{prediction.modelos?.svm?.semanas_estimadas} semanas</span>
+                    </p>
+                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">Hiperplano optimizado por SGD</p>
+                  </div>
+                </div>
+
               </div>
 
-              {/* Card 2: CatBoost */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-extrabold text-slate-800 text-base">CatBoost</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gradient Boosting</p>
-                    </div>
-                    <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
-                  </div>
-
-                  <div className="flex justify-center py-2">
-                    <CircularProgress
-                      percentage={Math.round(prediction.modelos!.catboost.prob_prematuro * 100)}
-                      strokeColor={getRiskColor(Math.round(prediction.modelos!.catboost.prob_prematuro * 100))}
-                    />
-                  </div>
-
-                  {/* Sección Interna: Parámetros del Modelo de soporte */}
-                  <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Parámetros del Modelo</span>
-                    <div className="flex justify-between py-1.5 border-b border-slate-50">
-                      <span className="text-slate-400 font-medium">Margen de Decisión:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.catboost.margen}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-50">
-                      <span className="text-slate-400 font-medium">Intervalo de Confianza:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.catboost.ic95}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5">
-                      <span className="text-slate-400 font-medium">Precisión Curva ROC:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.catboost.accuracy}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
-                  <p className="text-xs font-bold text-slate-500">
-                    Parto Estimado: <span className="text-amber-600 font-black">{prediction.modelos!.catboost.semanas_estimadas} semanas</span>
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-medium mt-0.5">Optimizador nativo simétrico .cbm</p>
-                </div>
-              </div>
-
-              {/* Card 3: SVM Lineal */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-extrabold text-slate-800 text-base">Regresion Logistica</h3>
-                    </div>
-                    <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">Completado</span>
-                  </div>
-
-                  <div className="flex justify-center py-2">
-                    <CircularProgress
-                      percentage={Math.round(prediction.modelos!.svm.prob_prematuro * 100)}
-                      strokeColor={getRiskColor(Math.round(prediction.modelos!.svm.prob_prematuro * 100))}
-                    />
-                  </div>
-
-                  {/* Sección Interna: Parámetros del Modelo de soporte */}
-                  <div className="space-y-2.5 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Parámetros del Modelo</span>
-                    <div className="flex justify-between py-1.5 border-b border-slate-50">
-                      <span className="text-slate-400 font-medium">Margen de Decisión:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.svm.margen}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5 border-b border-slate-50">
-                      <span className="text-slate-400 font-medium">Intervalo de Confianza:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.svm.ic95}</span>
-                    </div>
-                    <div className="flex justify-between py-1.5">
-                      <span className="text-slate-400 font-medium">Precisión Curva ROC:</span>
-                      <span className="font-bold text-slate-700">{MODEL_METADATA.svm.accuracy}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-50 flex flex-col items-center">
-                  <p className="text-xs font-bold text-slate-500">
-                    Parto Estimado: <span className="text-[#BA1A1A] font-black">{prediction.modelos!.svm.semanas_estimadas} semanas</span>
-                  </p>
-                  <p className="text-[9px] text-slate-400 font-medium mt-0.5">LinearSVC con márgenes suaves optimizados</p>
-                </div>
-              </div>
-
+              {/* Componente de Tendencia de Gráfico */}
+              {historial.length > 0 && <RiskTrendChart historial={historial} />}
             </div>
           )}
         </>
       )}
 
-      {/* GRÁFICO DE TENDENCIA */}
-      {selectedPacienteId !== null && (
-        <RiskTrendChart historial={historial} />
-      )}
-
-      {/* 3. ACORDEÓN INFERIOR - RESUMEN DE DATOS DE ENTRADA (Sincronizado) */}
+      {/* ACORDEÓN — RESUMEN DE VARIABLES CLÍNICAS */}
       {profile && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all duration-300">
           <button
@@ -833,7 +814,7 @@ export const PredictionPanel: React.FC = () => {
         </div>
       )}
 
-      {/* 4. ACCIONES INFERIORES */}
+      {/* ACCIONES INFERIORES */}
       {emailMsg && (
         <div className={`rounded-xl px-4 py-2.5 text-sm font-semibold print:hidden ${
           emailMsg.includes('enviado') || emailMsg.includes('Enviado')

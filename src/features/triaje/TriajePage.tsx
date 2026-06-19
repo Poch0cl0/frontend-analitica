@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTriajePriorizados, sincronizarTriaje, exportarReportePaciente, enviarReportePaciente } from '../../services/api';
 import type { TriajePriorizadoItem, TriajeAlgoritmo } from '../../services/api';
@@ -25,7 +25,7 @@ const ALGORITMOS: { key: TriajeAlgoritmo; label: string }[] = [
 ];
 
 function getNivelConfig(nivel: string) {
-  const n = nivel.toLowerCase();
+  const n = nivel?.toLowerCase();
   return NIVELES.find(l => l.key === n) || NIVELES[3];
 }
 
@@ -70,15 +70,22 @@ export default function TriajePage() {
     loading: boolean;
   } | null>(null);
 
+  // CORRECCIÓN: try-catch añadido para evitar congelamiento de UI en errores de API
   const handleVerClinicos = async (p: TriajePriorizadoItem) => {
     setClinicoModal({ nombre: `${p.nombre} ${p.apellidos}`, dni: p.dni, form: null, loading: true });
-    const loaded = await loadAtenderFormForPaciente(p.paciente_id);
-    setClinicoModal({
-      nombre: `${p.nombre} ${p.apellidos}`,
-      dni: p.dni,
-      form: loaded.form,
-      loading: false,
-    });
+    try {
+      const loaded = await loadAtenderFormForPaciente(p.paciente_id);
+      setClinicoModal({
+        nombre: `${p.nombre} ${p.apellidos}`,
+        dni: p.dni,
+        form: loaded.form,
+        loading: false,
+      });
+    } catch (err) {
+      console.error("Error al cargar datos clínicos", err);
+      setClinicoModal(null);
+      alert("No se pudieron cargar los datos clínicos de la paciente.");
+    }
   };
 
   const downloadBlob = (blob: Blob, filename: string) => {
@@ -117,12 +124,14 @@ export default function TriajePage() {
     }
   };
 
-  const conteos: Record<NivelUrgencia, number> = {
-    rojo: todos.filter(p => p.nivel_urgencia.toLowerCase() === 'rojo').length,
-    naranja: todos.filter(p => p.nivel_urgencia.toLowerCase() === 'naranja').length,
-    amarillo: todos.filter(p => p.nivel_urgencia.toLowerCase() === 'amarillo').length,
-    verde: todos.filter(p => p.nivel_urgencia.toLowerCase() === 'verde').length,
-  };
+  const conteos = useMemo((): Record<NivelUrgencia, number> => {
+    return {
+      rojo: todos.filter(p => p.nivel_urgencia?.toLowerCase() === 'rojo').length,
+      naranja: todos.filter(p => p.nivel_urgencia?.toLowerCase() === 'naranja').length,
+      amarillo: todos.filter(p => p.nivel_urgencia?.toLowerCase() === 'amarillo').length,
+      verde: todos.filter(p => p.nivel_urgencia?.toLowerCase() === 'verde').length,
+    };
+  }, [todos]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -162,7 +171,7 @@ export default function TriajePage() {
     setFiltrados(
       nivelActivo === 'todos'
         ? todos
-        : todos.filter(p => p.nivel_urgencia.toLowerCase() === nivelActivo),
+        : todos.filter(p => p.nivel_urgencia?.toLowerCase() === nivelActivo),
     );
   }, [todos, nivelActivo]);
 
@@ -320,7 +329,7 @@ export default function TriajePage() {
                 <div className="md:w-36 flex-shrink-0 flex flex-col items-center justify-center p-5 border-b md:border-b-0 md:border-r border-gray-100"
                   style={{ backgroundColor: cfg.bg }}>
                   <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: cfg.color }}>
-                    {p.nivel_urgencia.toUpperCase()}
+                    {p.nivel_urgencia?.toUpperCase()}
                   </span>
                   <span className="text-4xl font-black" style={{ color: cfg.color }}>{score}</span>
                   <span className="text-[10px] font-bold text-gray-400 uppercase">SCORE</span>
@@ -341,7 +350,7 @@ export default function TriajePage() {
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
                         style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}>
-                        {p.nivel_urgencia.toUpperCase()} PRIORIDAD
+                        {p.nivel_urgencia?.toUpperCase()} PRIORIDAD
                       </span>
                       <span className="text-[10px] text-gray-400 font-mono">ID: #{p.paciente_id}</span>
                     </div>
