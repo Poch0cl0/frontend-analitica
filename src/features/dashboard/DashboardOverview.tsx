@@ -68,7 +68,7 @@ export default function DashboardOverview() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   
   // Modales
-  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'detail' | 'delete' | 'patientsWithoutAppointment' | null>(null);
+  const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'detail' | 'delete' | 'patientsWithoutAppointment' | 'registerPatient' | null>(null);
   const [selectedCitaId, setSelectedCitaId] = useState<number | null>(null);
   const [selectedCitaDetail, setSelectedCitaDetail] = useState<CitaResponseEnriquecida | null>(null);
   const [selectedPatientPerfil, setSelectedPatientPerfil] = useState<PacientePerfilResponse | null>(null);
@@ -722,11 +722,11 @@ export default function DashboardOverview() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/75 border-b border-gray-100 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3.5 px-5">Hora</th>
+                    <th className="py-3.5 px-5">Fecha</th>
+                    <th className="py-3.5 px-4">Hora</th>
                     <th className="py-3.5 px-4">Paciente</th>
-                    <th className="py-3.5 px-4 text-center">Gestación (Semanas)</th>
-                    <th className="py-3.5 px-4">Riesgo Prenatal</th>
-                    <th className="py-3.5 px-4">Obstetra</th>
+                    <th className="py-3.5 px-4">Médico</th>
+                    <th className="py-3.5 px-4">Tipo de Cita</th>
                     <th className="py-3.5 px-4">Estado</th>
                     <th className="py-3.5 px-5 text-right">Acciones</th>
                   </tr>
@@ -734,41 +734,31 @@ export default function DashboardOverview() {
                 <tbody className="divide-y divide-gray-100 text-sm">
                   {citasHoy.map((cita) => (
                     <tr key={cita.id} className="hover:bg-gray-50/50 transition-colors">
-                      {/* Hora */}
                       <td className="py-3.5 px-5 font-bold text-gray-900 whitespace-nowrap">
+                        {new Date(cita.fecha_hora).toLocaleDateString('es-ES')}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-gray-900 whitespace-nowrap">
                         {formatHour(cita.fecha_hora)}
                       </td>
-                      {/* Paciente */}
                       <td className="py-3.5 px-4">
                         <div className="font-semibold text-gray-900 leading-tight">
                           {cita.paciente_nombre || 'Paciente no identificada'}
                         </div>
                         <span className="text-[10px] text-gray-400 font-medium block mt-0.5">DNI {cita.paciente_id}</span>
                       </td>
-                      {/* Semanas Gestación */}
-                      <td className="py-3.5 px-4 text-center font-medium text-gray-700">
-                        {cita.semanas_gestacion != null ? `${cita.semanas_gestacion} sem` : '--'}
-                      </td>
-                      {/* Nivel de Riesgo */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getRiskBadgeStyles(cita.nivel_riesgo)}`}>
-                          {cita.nivel_riesgo || 'Sin clasificar'}
-                        </span>
-                      </td>
-                      {/* Médico/Obstetra */}
                       <td className="py-3.5 px-4 text-gray-600 font-medium whitespace-nowrap">
                         {cita.medico_nombre ? `Dr. ${cita.medico_nombre.split(' ')[0]}` : '--'}
                       </td>
-                      {/* Estado */}
+                      <td className="py-3.5 px-4 text-gray-600 font-medium">
+                        {cita.motivo || 'N/A'}
+                      </td>
                       <td className="py-3.5 px-4">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadgeStyles(cita.estado)}`}>
                           {getStatusLabel(cita.estado)}
                         </span>
                       </td>
-                      {/* Acciones */}
                       <td className="py-3.5 px-5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Ver */}
                           <button
                             onClick={() => handleOpenDetailModal(cita.id)}
                             title="Ver detalle"
@@ -779,7 +769,6 @@ export default function DashboardOverview() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          {/* Editar */}
                           <button
                             onClick={() => handleOpenEditModal(cita)}
                             title="Editar cita"
@@ -790,7 +779,6 @@ export default function DashboardOverview() {
                               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          {/* Cancelar/Eliminar */}
                           <button
                             onClick={() => handleOpenDeleteModal(cita.id)}
                             title="Cancelar cita"
@@ -861,114 +849,72 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* REGISTRO RÁPIDO DE PACIENTES */}
+          {/* REGISTRO RÁPIDO DE PACIENTES - BOTÓN */}
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col space-y-4">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">Registro Rápido de Pacientes</h2>
-              <p className="text-[10px] text-gray-500">Ingresa una nueva gestante al sistema de alertas de forma inmediata.</p>
-            </div>
-
-            <form onSubmit={handleRegisterPatient} className="space-y-3">
-              {/* DNI */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">DNI *</label>
-                <input
-                  type="text"
-                  name="dni"
-                  required
-                  value={quickPatient.dni}
-                  onChange={handleQuickPatientChange}
-                  placeholder="Número de identidad"
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50"
-                />
-              </div>
-
-              {/* Nombres */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Nombres *</label>
-                <input
-                  type="text"
-                  name="nombre"
-                  required
-                  value={quickPatient.nombre}
-                  onChange={handleQuickPatientChange}
-                  placeholder="Nombre de la paciente"
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50"
-                />
-              </div>
-
-              {/* Apellidos */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Apellidos *</label>
-                <input
-                  type="text"
-                  name="apellidos"
-                  required
-                  value={quickPatient.apellidos}
-                  onChange={handleQuickPatientChange}
-                  placeholder="Apellidos completos"
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50"
-                />
-              </div>
-
-              {/* Fecha Nacimiento */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Fecha de Nacimiento *</label>
-                <input
-                  type="date"
-                  name="fecha_nacimiento"
-                  required
-                  value={quickPatient.fecha_nacimiento}
-                  onChange={handleQuickPatientChange}
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50"
-                />
-              </div>
-
-              {/* Teléfono */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono Principal</label>
-                <input
-                  type="text"
-                  name="telefono_principal"
-                  value={quickPatient.telefono_principal || ''}
-                  onChange={handleQuickPatientChange}
-                  placeholder="Celular"
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50"
-                />
-              </div>
-
-              {/* Médico Asignado */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Obstetra Asignado</label>
-                <select
-                  name="medico_asignado_id"
-                  value={quickPatient.medico_asignado_id || ''}
-                  onChange={handleQuickPatientChange}
-                  className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50 text-gray-700"
-                >
-                  <option value="">Seleccionar Médico</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isRegisteringPatient}
-                className="w-full mt-2 py-2.5 px-4 text-xs font-bold text-white rounded-lg shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150"
+            <h2 className="text-sm font-bold text-gray-900">Gestión de Pacientes</h2>
+            <button
+                onClick={() => setActiveModal('registerPatient')}
+                className="w-full py-2.5 px-4 text-xs font-bold text-white rounded-lg shadow-sm hover:opacity-90 active:scale-95 transition-all duration-150"
                 style={{ backgroundColor: '#612853' }}
               >
-                {isRegisteringPatient ? 'Registrando...' : 'Registrar Gestante'}
+                Registrar Nueva Gestante
               </button>
-            </form>
           </div>
 
         </div>
 
       </div>
 
-      {/* ==================== MODAL: CREAR CITA ==================== */}
+      {/* ==================== MODAL: REGISTRAR PACIENTE ==================== */}
+      {activeModal === 'registerPatient' && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-extrabold text-lg text-gray-900">Registrar Nueva Gestante</h3>
+              <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <form onSubmit={handleRegisterPatient} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">DNI *</label>
+                <input type="text" name="dni" required value={quickPatient.dni} onChange={handleQuickPatientChange} placeholder="Número de identidad" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Nombres *</label>
+                <input type="text" name="nombre" required value={quickPatient.nombre} onChange={handleQuickPatientChange} placeholder="Nombre de la paciente" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Apellidos *</label>
+                <input type="text" name="apellidos" required value={quickPatient.apellidos} onChange={handleQuickPatientChange} placeholder="Apellidos completos" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Fecha de Nacimiento *</label>
+                <input type="date" name="fecha_nacimiento" required value={quickPatient.fecha_nacimiento} onChange={handleQuickPatientChange} className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono Principal</label>
+                <input type="text" name="telefono_principal" value={quickPatient.telefono_principal || ''} onChange={handleQuickPatientChange} placeholder="Celular" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Obstetra Asignado</label>
+                <select name="medico_asignado_id" value={quickPatient.medico_asignado_id || ''} onChange={handleQuickPatientChange} className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50 text-gray-700">
+                  <option value="">Seleccionar Médico</option>
+                  {medicos.map(m => (
+                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" disabled={isRegisteringPatient} className="w-full mt-2 py-2.5 px-4 text-xs font-bold text-white rounded-lg shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all duration-150" style={{ backgroundColor: '#612853' }}>
+                {isRegisteringPatient ? 'Registrando...' : 'Registrar Gestante'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
       {activeModal === 'create' && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">

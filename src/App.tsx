@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import Login from './features/auth/Login';
 import SidebarLayout from './components/SidebarLayout';
 import DashboardOverview from './features/dashboard/DashboardOverview';
+import CitasPage from './features/citas/CitasPage';
 import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import { NavProvider } from './contexts/NavContext';
@@ -56,7 +57,7 @@ function App() {
 
             <Route path="/citas" element={
               <ProtectedRoute>
-                <SidebarLayout><DashboardOverview /></SidebarLayout>
+                <SidebarLayout><CitasPage /></SidebarLayout>
               </ProtectedRoute>
             } />
           <Route path="/prediccion" element={
