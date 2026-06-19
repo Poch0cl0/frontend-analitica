@@ -279,11 +279,6 @@ export const getPacientePerfil = async (pacienteId: number): Promise<PacientePer
   return response.data;
 };
 
-export const getUltimaPrediccion = async (pacienteId: number): Promise<PrediccionUltimaResponse> => {
-  const response = await api.get<PrediccionUltimaResponse>(`/api/prediccion/paciente/${pacienteId}/ultima`);
-  return response.data;
-};
-
 export const ejecutarPrediccionConsenso = async (pacienteId: number): Promise<PrediccionConsensoResponse> => {
   const response = await api.post<PrediccionConsensoResponse>(`/api/prediccion/consenso/${pacienteId}`);
   return response.data;
@@ -452,4 +447,17 @@ export interface RecomendacionResponse {
 export const getRecomendacionesPaciente = async (pacienteId: number): Promise<RecomendacionResponse[]> => {
   const response = await api.get<RecomendacionResponse[]>(`/api/recomendaciones/paciente/${pacienteId}`);
   return response.data;
+};
+
+
+// En tu src/services/api.ts
+
+export const getUltimaPrediccion = async (pacienteId: number): Promise<{ prediccion_id: number }> => {
+  const response = await api.get(`/api/prediccion/paciente/${pacienteId}/ultima`);
+  return response.data;
+};
+
+export const ejecutarRecomendacionesS4 = async (pacienteId: number, prediccionId: number): Promise<void> => {
+  // Petición exacta según tu esquema de rutas por PATH
+  await api.post(`/api/recomendaciones/ejecutar/${pacienteId}/${prediccionId}`);
 };
