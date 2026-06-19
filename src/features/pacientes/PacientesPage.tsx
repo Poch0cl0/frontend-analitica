@@ -47,26 +47,24 @@ interface PatientForm {
   fecha_nacimiento: string;
   telefono_principal: string;
   email: string;
-  medico_asignado_id: string;
 }
 
 const emptyForm: PatientForm = {
   nombre: '', apellidos: '', dni: '', fecha_nacimiento: '',
-  telefono_principal: '', email: '', medico_asignado_id: '',
+  telefono_principal: '', email: '',
 };
 
 // ── MODAL: CREATE / EDIT ──────────────────────────────────────────────────────
 interface PatientModalProps {
   mode: 'create' | 'edit';
   form: PatientForm;
-  medicos: MedicoResumen[];
   isSaving: boolean;
   onClose: () => void;
   onSubmit: (e: FormEvent) => void;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }
 
-function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChange }: PatientModalProps) {
+function PatientModal({ mode, form, isSaving, onClose, onSubmit, onChange }: PatientModalProps) {
   const edad = form.fecha_nacimiento ? calcEdad(form.fecha_nacimiento) : '';
 
   return (
@@ -98,14 +96,12 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
 
         <div className="overflow-y-auto flex-1">
         <form onSubmit={onSubmit} className="p-6 space-y-5">
-          {/* Section: Datos Personales */}
           <div>
             <div className="flex items-center gap-2 mb-4 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
               <span className="text-sm font-bold text-gray-800">Datos Personales</span>
             </div>
 
             <div className="space-y-3">
-              {/* Nombres completos */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Nombres completos *</label>
                 <input name="nombre" required value={form.nombre} onChange={onChange} placeholder="Ej. Ana Lucía"
@@ -116,7 +112,6 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
                 />
               </div>
 
-              {/* Apellidos */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Apellidos *</label>
                 <input name="apellidos" required value={form.apellidos} onChange={onChange} placeholder="Ej. Pérez García"
@@ -127,7 +122,6 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
                 />
               </div>
 
-              {/* DNI + Fecha nacimiento */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">DNI *</label>
@@ -149,7 +143,6 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
                 </div>
               </div>
 
-              {/* Edad + Teléfono */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Edad</label>
@@ -169,7 +162,6 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
                 </div>
               </div>
 
-              {/* Email */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Correo electrónico (Opcional)</label>
                 <input type="email" name="email" value={form.email} onChange={onChange} placeholder="paciente@ejemplo.com"
@@ -179,36 +171,18 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
                   onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'}
                 />
               </div>
-
-              {/* Médico asignado */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Médico / Obstetra Asignado</label>
-                <select name="medico_asignado_id" value={form.medico_asignado_id} onChange={onChange}
-                  className="w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all bg-white"
-                  style={{ borderColor: '#E8D5EF' }}
-                  onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-                  onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'}
-                >
-                  <option value="">Sin médico asignado</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
-          {/* Info note */}
           <div className="flex items-start gap-2.5 p-3 bg-blue-50 rounded-xl border border-blue-100">
             <svg className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
             <p className="text-xs text-blue-700 font-medium leading-relaxed">
-              Los datos clínicos serán completados por el médico asignado durante la anamnesis inicial.
+              El médico asignado se establecerá automáticamente al agendar la primera cita.
             </p>
           </div>
 
-          {/* Footer */}
           <div className="flex items-center gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border-2 text-gray-700 hover:bg-gray-50 transition-colors"
@@ -233,6 +207,8 @@ function PatientModal({ mode, form, medicos, isSaving, onClose, onSubmit, onChan
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function PacientesPage() {
   const navigate = useNavigate();
+  const userRole = localStorage.getItem('user_role') || '';
+  const isDoctor = userRole === 'medico';
 
   // Data
   const [pacientes, setPacientes] = useState<PacienteResponse[]>([]);
@@ -269,7 +245,7 @@ export default function PacientesPage() {
         getPacientesFiltered({
           q: search || undefined,
           estado: filterEstado || undefined,
-          medico_id: filterMedico ? Number(filterMedico) : undefined,
+          medico_id: (!isDoctor && filterMedico) ? Number(filterMedico) : undefined,
           mes_registro: filterMes ? Number(filterMes) : undefined,
           page, limit,
         }),
@@ -284,7 +260,7 @@ export default function PacientesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [search, filterEstado, filterMedico, filterMes, page, limit]);
+  }, [search, filterEstado, filterMedico, filterMes, page, limit, isDoctor]);
 
   useEffect(() => {
     const init = async () => {
@@ -327,7 +303,6 @@ export default function PacientesPage() {
         fecha_nacimiento: form.fecha_nacimiento,
         telefono_principal: form.telefono_principal || null,
         email: form.email || null,
-        medico_asignado_id: form.medico_asignado_id ? Number(form.medico_asignado_id) : null,
       };
       await createPaciente(payload);
       showToast(`Paciente ${form.nombre} registrada exitosamente`, 'success');
@@ -350,7 +325,6 @@ export default function PacientesPage() {
       fecha_nacimiento: p.fecha_nacimiento.split('T')[0],
       telefono_principal: p.telefono_principal || '',
       email: p.email || '',
-      medico_asignado_id: p.medico_asignado_id ? String(p.medico_asignado_id) : '',
     });
     setActiveModal('edit');
   };
@@ -366,7 +340,6 @@ export default function PacientesPage() {
         fecha_nacimiento: form.fecha_nacimiento,
         telefono_principal: form.telefono_principal || null,
         email: form.email || null,
-        medico_asignado_id: form.medico_asignado_id ? Number(form.medico_asignado_id) : null,
       };
       await updatePaciente(selectedPaciente.id, payload);
       showToast('Datos actualizados correctamente', 'success');
@@ -394,7 +367,7 @@ export default function PacientesPage() {
       setActiveModal(null);
       await loadPacientes();
     } catch (err: any) {
-      showToast(err?.response?.data?.detail || 'Error al eliminar paciente', 'error');
+      showToast(err?.response?.data?.detail || 'Error al desactivar paciente', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -435,19 +408,25 @@ export default function PacientesPage() {
         {/* ── HEADER ─────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 border-b border-gray-100">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800">Pacientes</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Gestión de pacientes registradas</p>
+            <h1 className="text-2xl font-extrabold text-slate-800">
+              {isDoctor ? 'Mis Pacientes' : 'Pacientes'}
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {isDoctor ? 'Pacientes asignados a tu consulta' : 'Gestión de pacientes registradas'}
+            </p>
           </div>
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition-all"
-            style={{ backgroundColor: PRIMARY }}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Nueva Paciente
-          </button>
+          {!isDoctor && (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold text-white shadow-sm hover:opacity-90 active:scale-95 transition-all"
+              style={{ backgroundColor: PRIMARY }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Nueva Paciente
+            </button>
+          )}
         </div>
 
         {/* ── FILTERS ────────────────────────────────────────────────────── */}
@@ -472,17 +451,19 @@ export default function PacientesPage() {
             <option value="">Estado: Todos</option>
             <option value="activo">Activas</option>
             <option value="inactivo">Inactivas</option>
-            <option value="sin_medico">Sin médico</option>
+            {!isDoctor && <option value="sin_medico">Sin médico</option>}
           </select>
 
-          {/* Médico */}
-          <select value={filterMedico} onChange={e => { setFilterMedico(e.target.value); setPage(1); }}
-            className={inputCls}>
-            <option value="">Médico Asignado</option>
-            {medicos.map(m => (
-              <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-            ))}
-          </select>
+          {/* Médico — solo para secretaria/admin */}
+          {!isDoctor && (
+            <select value={filterMedico} onChange={e => { setFilterMedico(e.target.value); setPage(1); }}
+              className={inputCls}>
+              <option value="">Médico Asignado</option>
+              {medicos.map(m => (
+                <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
+              ))}
+            </select>
+          )}
 
           {/* Mes */}
           <select value={filterMes} onChange={e => { setFilterMes(e.target.value); setPage(1); }}
@@ -506,10 +487,14 @@ export default function PacientesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <p className="text-sm text-gray-500 font-medium">No se encontraron pacientes</p>
-              <button onClick={handleOpenCreate} className="text-xs font-bold py-2 px-4 rounded-lg text-white hover:opacity-90" style={{ backgroundColor: PRIMARY }}>
-                Registrar primera paciente
-              </button>
+              <p className="text-sm text-gray-500 font-medium">
+                {isDoctor ? 'No tienes pacientes asignados aún' : 'No se encontraron pacientes'}
+              </p>
+              {!isDoctor && (
+                <button onClick={handleOpenCreate} className="text-xs font-bold py-2 px-4 rounded-lg text-white hover:opacity-90" style={{ backgroundColor: PRIMARY }}>
+                  Registrar primera paciente
+                </button>
+              )}
             </div>
           ) : (
             <table className="w-full text-left">
@@ -520,7 +505,7 @@ export default function PacientesPage() {
                   <th className="py-3.5 px-4">DNI / ID</th>
                   <th className="py-3.5 px-4">Edad</th>
                   <th className="py-3.5 px-4">Registro</th>
-                  <th className="py-3.5 px-4">Médico</th>
+                  {!isDoctor && <th className="py-3.5 px-4">Médico</th>}
                   <th className="py-3.5 px-4">Estado</th>
                   <th className="py-3.5 px-5 text-right">Acciones</th>
                 </tr>
@@ -548,9 +533,11 @@ export default function PacientesPage() {
                       <td className="py-3.5 px-4 text-sm text-gray-600 font-mono">{p.dni}</td>
                       <td className="py-3.5 px-4 text-sm text-gray-600">{calcEdad(p.fecha_nacimiento)} años</td>
                       <td className="py-3.5 px-4 text-sm text-gray-500">{formatRegistro(p.created_at)}</td>
-                      <td className="py-3.5 px-4 text-sm text-gray-600">
-                        {medico ? `Dr. ${medico.nombre} ${medico.apellidos}` : <span className="text-gray-400 italic">Pendiente</span>}
-                      </td>
+                      {!isDoctor && (
+                        <td className="py-3.5 px-4 text-sm text-gray-600">
+                          {medico ? `Dr. ${medico.nombre} ${medico.apellidos}` : <span className="text-gray-400 italic">Pendiente</span>}
+                        </td>
+                      )}
                       <td className="py-3.5 px-4">
                         <span className="flex items-center gap-1.5 text-xs font-semibold">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: est.dot }} />
@@ -569,24 +556,43 @@ export default function PacientesPage() {
                             </svg>
                             <span className="hidden sm:inline">Ver</span>
                           </button>
-                          {/* Editar */}
-                          <button onClick={() => handleOpenEdit(p)}
-                            title="Editar paciente"
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors text-xs font-semibold border border-amber-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            <span className="hidden sm:inline">Editar</span>
-                          </button>
-                          {/* Eliminar */}
-                          <button onClick={() => handleOpenDelete(p)}
-                            title="Desactivar paciente"
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-semibold border border-red-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span className="hidden sm:inline">Eliminar</span>
-                          </button>
+
+                          {/* Doctor: ir a datos clínicos */}
+                          {isDoctor && (
+                            <button
+                              onClick={() => navigate(`/pacientes/${p.id}`, { state: { initialTab: 'clinico' } })}
+                              title="Actualizar datos clínicos"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors text-xs font-semibold border border-violet-100">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span className="hidden sm:inline">Datos médicos</span>
+                            </button>
+                          )}
+
+                          {/* Secretaria: editar datos personales */}
+                          {!isDoctor && (
+                            <button onClick={() => handleOpenEdit(p)}
+                              title="Editar paciente"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors text-xs font-semibold border border-amber-100">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              <span className="hidden sm:inline">Editar</span>
+                            </button>
+                          )}
+
+                          {/* Secretaria: desactivar */}
+                          {!isDoctor && (
+                            <button onClick={() => handleOpenDelete(p)}
+                              title="Desactivar paciente"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-semibold border border-red-100">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              <span className="hidden sm:inline">Desactivar</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -605,7 +611,6 @@ export default function PacientesPage() {
             </span>
 
             <div className="flex items-center gap-3">
-              {/* Page size selector */}
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <span className="hidden sm:inline">Ver</span>
                 <select value={limit} onChange={e => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -615,7 +620,6 @@ export default function PacientesPage() {
                 <span className="hidden sm:inline">por página</span>
               </div>
 
-              {/* Prev / page info / Next */}
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
                   className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none transition-colors">
@@ -639,16 +643,18 @@ export default function PacientesPage() {
       {/* ── KPI CARDS ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
 
-        {/* Card 1: Nuevas esta semana */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Nuevas esta semana</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            {isDoctor ? 'Mis pacientes activas' : 'Nuevas esta semana'}
+          </p>
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-extrabold text-gray-900">{nuevasEstaSemana}</span>
-            <span className="text-sm font-bold text-emerald-600 mb-0.5">↑ en esta semana</span>
+            <span className="text-3xl font-extrabold text-gray-900">
+              {isDoctor ? total : nuevasEstaSemana}
+            </span>
+            {!isDoctor && <span className="text-sm font-bold text-emerald-600 mb-0.5">↑ en esta semana</span>}
           </div>
         </div>
 
-        {/* Card 2: Citas pendientes */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Citas pendientes</p>
           <div className="flex items-end gap-2">
@@ -657,28 +663,36 @@ export default function PacientesPage() {
           <p className="text-xs text-gray-400 font-medium mt-1">Para los próximos 7 días</p>
         </div>
 
-        {/* Card 3: Sin médico asignado */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Sin médico asignado</p>
-          <div className="flex items-end gap-2">
-            <span className="text-3xl font-extrabold" style={{ color: sinMedicoTotal > 0 ? '#DC2626' : '#1E293B' }}>
-              {String(sinMedicoTotal).padStart(2, '0')}
-            </span>
+        {!isDoctor ? (
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Sin médico asignado</p>
+            <div className="flex items-end gap-2">
+              <span className="text-3xl font-extrabold" style={{ color: sinMedicoTotal > 0 ? '#DC2626' : '#1E293B' }}>
+                {String(sinMedicoTotal).padStart(2, '0')}
+              </span>
+            </div>
+            {sinMedicoTotal > 0 && (
+              <p className="text-xs font-semibold mt-1" style={{ color: '#DC2626' }}>Requiere atención urgente</p>
+            )}
           </div>
-          {sinMedicoTotal > 0 && (
-            <p className="text-xs font-semibold mt-1" style={{ color: '#DC2626' }}>Requiere atención urgente</p>
-          )}
-        </div>
+        ) : (
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Citas hoy</p>
+            <div className="flex items-end gap-2">
+              <span className="text-3xl font-extrabold text-gray-900">{resumen?.citas_hoy ?? '—'}</span>
+            </div>
+            <p className="text-xs text-gray-400 font-medium mt-1">Programadas para hoy</p>
+          </div>
+        )}
       </div>
 
       {/* ══ MODALS ══════════════════════════════════════════════════════════ */}
 
-      {/* Create / Edit */}
-      {(activeModal === 'create' || activeModal === 'edit') && (
+      {/* Create / Edit (solo secretaria) */}
+      {!isDoctor && (activeModal === 'create' || activeModal === 'edit') && (
         <PatientModal
           mode={activeModal}
           form={form}
-          medicos={medicos}
           isSaving={isSaving}
           onClose={() => setActiveModal(null)}
           onSubmit={activeModal === 'create' ? handleCreate : handleEdit}
@@ -686,8 +700,8 @@ export default function PacientesPage() {
         />
       )}
 
-      {/* Delete confirmation */}
-      {activeModal === 'delete' && selectedPaciente && (
+      {/* Delete confirmation (solo secretaria) */}
+      {!isDoctor && activeModal === 'delete' && selectedPaciente && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
              onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4"

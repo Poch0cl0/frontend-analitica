@@ -5,11 +5,13 @@ import {
   getUltimaPrediccion,
   ejecutarPrediccionConsenso,
   getPacientes,
+  getHistorialPredicciones,
 } from '../../services/api';
 import type {
   PacientePerfilResponse,
   PrediccionUltimaResponse,
-  PacienteResponse
+  PacienteResponse,
+  PrediccionHistorialItem,
 } from '../../services/api';
 import {
   ClipboardList,
@@ -101,6 +103,88 @@ const CircularProgress = ({
   );
 };
 
+function riskColor(nivel: string | null | undefined): string {
+  switch (nivel?.toLowerCase()) {
+    case 'critico': case 'crítico': case 'alto': return '#BA1A1A';
+    case 'medio': return '#CA8A04';
+    case 'bajo': return '#16A34A';
+    default: return '#612853';
+  }
+}
+
+interface RiskTrendChartProps {
+  historial: PrediccionHistorialItem[];
+}
+
+const RiskTrendChart: React.FC<RiskTrendChartProps> = ({ historial }) => {
+  const sorted = [...historial]
+    .filter(h => h.prob_consenso != null)
+    .sort((a, b) => new Date(a.fecha_prediccion).getTime() - new Date(b.fecha_prediccion).getTime());
+
+  if (sorted.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
+        <p className="text-sm text-slate-500">Sin historial de predicciones para mostrar tendencia.</p>
+      </div>
+    );
+  }
+
+  const W = 600;
+  const H = 200;
+  const padL = 48;
+  const padR = 16;
+  const padT = 20;
+  const padB = 40;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const points = sorted.map((h, i) => {
+    const x = padL + (sorted.length === 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW);
+    const y = padT + chartH - (Number(h.prob_consenso) * chartH);
+    return { x, y, h };
+  });
+
+  const polyline = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <TrendingUp className="w-5 h-5 text-[#612853]" />
+        <h3 className="font-extrabold text-slate-800 text-sm">Tendencia de Riesgo Prematuro</h3>
+        <span className="text-[10px] text-slate-400 font-medium ml-auto">{sorted.length} predicción{sorted.length !== 1 ? 'es' : ''}</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+        {/* Grid lines */}
+        {[0, 25, 50, 75, 100].map(pct => {
+          const y = padT + chartH - (pct / 100) * chartH;
+          return (
+            <g key={pct}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#F1F5F9" strokeWidth="1" />
+              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#94A3B8" fontWeight="600">{pct}%</text>
+            </g>
+          );
+        })}
+        {/* Line (only if 2+ points) */}
+        {points.length >= 2 && (
+          <polyline points={polyline} fill="none" stroke="#612853" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        )}
+        {/* Points */}
+        {points.map((p) => (
+          <g key={p.h.id}>
+            <circle cx={p.x} cy={p.y} r="5" fill={riskColor(p.h.nivel_riesgo)} stroke="white" strokeWidth="2" />
+            <text x={p.x} y={H - 8} textAnchor="middle" fontSize="8" fill="#94A3B8" fontWeight="600">
+              {new Date(p.h.fecha_prediccion).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <p className="text-[10px] text-slate-400 font-medium mt-2 text-center">
+        El gráfico se actualiza automáticamente con cada nueva predicción registrada.
+      </p>
+    </div>
+  );
+};
+
 export const PredictionPanel: React.FC = () => {
   const navigate = useNavigate();
 
@@ -113,6 +197,7 @@ export const PredictionPanel: React.FC = () => {
   // Estados para el perfil clínico y la predicción del paciente seleccionado
   const [profile, setProfile] = useState<PacientePerfilResponse | null>(null);
   const [prediction, setPrediction] = useState<PrediccionUltimaResponse | null>(null);
+  const [historial, setHistorial] = useState<PrediccionHistorialItem[]>([]);
 
   // Estados de carga y error
   const [loadingPatients, setLoadingPatients] = useState<boolean>(true);
@@ -152,13 +237,15 @@ export const PredictionPanel: React.FC = () => {
         setError(null);
 
         // Llamar en paralelo por perfil y última predicción
-        const [perfRes, predRes] = await Promise.all([
+        const [perfRes, predRes, histRes] = await Promise.all([
           getPacientePerfil(selectedPacienteId),
-          getUltimaPrediccion(selectedPacienteId)
+          getUltimaPrediccion(selectedPacienteId),
+          getHistorialPredicciones(selectedPacienteId),
         ]);
 
         setProfile(perfRes);
         setPrediction(predRes);
+        setHistorial(histRes);
       } catch (err: any) {
         console.error(err);
         setError('Error al cargar el perfil predictivo del paciente.');
@@ -178,9 +265,12 @@ export const PredictionPanel: React.FC = () => {
       setError(null);
       const res = await ejecutarPrediccionConsenso(selectedPacienteId);
       setPrediction(res);
-      // Recargar perfil para actualizar últimos campos sincronizados
-      const perfRes = await getPacientePerfil(selectedPacienteId);
+      const [perfRes, histRes] = await Promise.all([
+        getPacientePerfil(selectedPacienteId),
+        getHistorialPredicciones(selectedPacienteId),
+      ]);
       setProfile(perfRes);
+      setHistorial(histRes);
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.detail || 'Error al ejecutar los modelos de consenso de IA.');
@@ -660,6 +750,11 @@ export const PredictionPanel: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* GRÁFICO DE TENDENCIA */}
+      {selectedPacienteId !== null && (
+        <RiskTrendChart historial={historial} />
       )}
 
       {/* 3. ACORDEÓN INFERIOR - RESUMEN DE DATOS DE ENTRADA (Sincronizado) */}

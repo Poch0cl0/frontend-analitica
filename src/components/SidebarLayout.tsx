@@ -36,8 +36,8 @@ const menuGroups: MenuGroup[] = [
     label: 'MÓDULOS CLÍNICOS',
     items: [
       { label: 'Predicción de Riesgo', path: '/prediccion', icon: 'BrainCircuit', roles: ['medico', 'administrador'] },
-      { label: 'Recomendaciones', path: '/recomendaciones', icon: 'HeartPulse', roles: ['medico', 'administrador'] },
       { label: 'Triaje', path: '/triaje', icon: 'Activity', roles: ['medico', 'administrador'] },
+      { label: 'Recomendaciones', path: '/recomendaciones', icon: 'HeartPulse', roles: ['medico', 'administrador'] },
     ],
   },
   {

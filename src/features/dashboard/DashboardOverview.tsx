@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import {
   api,
   getDashboardResumen,
@@ -12,7 +12,8 @@ import {
   changeCitaEstado,
   getMedicos,
   getPacientes,
-  createPaciente
+  createPaciente,
+  getTriajeResumen,
 } from '../../services/api';
 import type {
   DashboardResumen,
@@ -21,7 +22,8 @@ import type {
   PacienteResponse,
   PacienteCreate,
   CitaCreate,
-  CitaUpdate
+  CitaUpdate,
+  TriajeResumen,
 } from '../../services/api';
 
 // ==================== TIPOS ADICIONALES ====================
@@ -55,9 +57,11 @@ interface PacientePerfilResponse {
 
 export default function DashboardOverview() {
   const location = useLocation();
+  const isDoctor = localStorage.getItem('user_role') === 'medico';
 
   // Estados del Dashboard
   const [resumen, setResumen] = useState<DashboardResumen | null>(null);
+  const [triajeResumen, setTriajeResumen] = useState<TriajeResumen | null>(null);
   const [citasHoy, setCitasHoy] = useState<CitaResponseEnriquecida[]>([]);
   const [medicos, setMedicos] = useState<MedicoResumen[]>([]);
   const [pacientes, setPacientes] = useState<PacienteResponse[]>([]);
@@ -148,14 +152,26 @@ export default function DashboardOverview() {
       const localTodayStr = `${year}-${month}-${day}`;
 
       // Peticiones paralelas
-      const [resumenData, citasData, medicosData, pacientesData] = await Promise.all([
+      const requests: Promise<unknown>[] = [
         getDashboardResumen(),
         getCitas(localTodayStr),
         getMedicos(),
-        getPacientes('', 1, 100)
-      ]);
+        getPacientes('', 1, 100),
+      ];
+      if (isDoctor) {
+        requests.push(getTriajeResumen());
+      }
+
+      const results = await Promise.all(requests);
+      const resumenData = results[0] as DashboardResumen;
+      const citasData = results[1] as CitaResponseEnriquecida[];
+      const medicosData = results[2] as MedicoResumen[];
+      const pacientesData = results[3] as { items: PacienteResponse[] };
 
       setResumen(resumenData);
+      if (isDoctor && results[4]) {
+        setTriajeResumen(results[4] as TriajeResumen);
+      }
       
       // Ordenar citas por fecha/hora cronológicamente
       const sortedCitas = [...citasData].sort((a, b) => 
@@ -600,9 +616,16 @@ export default function DashboardOverview() {
       {/* TITULO Y FILTROS */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Panel de Control Obstétrico</h1>
-          <p className="text-sm sm:text-base text-gray-500">Gestión de citas y monitoreo de alertas de parto prematuro en tiempo real.</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+            {isDoctor ? 'Panel Médico' : 'Panel de Control Obstétrico'}
+          </h1>
+          <p className="text-sm sm:text-base text-gray-500">
+            {isDoctor
+              ? 'Citas pendientes de atención y alertas de riesgo prenatal.'
+              : 'Gestión de citas y monitoreo de alertas de parto prematuro en tiempo real.'}
+          </p>
         </div>
+        {!isDoctor && (
         <button 
           onClick={() => handleOpenCreateModal()}
           className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150"
@@ -613,6 +636,7 @@ export default function DashboardOverview() {
           </svg>
           <span>Agendar Nueva Cita</span>
         </button>
+        )}
       </div>
 
       {/* FILA DE TARJETAS KPI (4) */}
@@ -660,7 +684,27 @@ export default function DashboardOverview() {
           </div>
         </div>
 
-        {/* KPI: Pacientes sin Cita con BOTÓN ACTIVO */}
+        {/* KPI: Pacientes sin Cita / Críticos Triaje (médico) */}
+        {isDoctor ? (
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between w-full">
+              <div>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Críticos (Triaje)</span>
+                <h3 className="text-3xl font-extrabold text-red-600 mt-1">{triajeResumen?.rojo ?? 0}</h3>
+              </div>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-red-50 text-red-600 border border-red-100">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+            <Link to="/triaje"
+              className="w-full mt-3 py-2 px-3 text-center text-xs font-bold rounded-lg border transition-all duration-150 hover:bg-red-50 focus:outline-none block"
+              style={{ borderColor: '#DC2626', color: '#DC2626' }}>
+              Ver triaje completo
+            </Link>
+          </div>
+        ) : (
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between w-full">
             <div>
@@ -681,6 +725,7 @@ export default function DashboardOverview() {
             Ver pacientes sin cita
           </button>
         </div>
+        )}
 
       </div>
 
@@ -861,7 +906,48 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          {/* REGISTRO RÁPIDO DE PACIENTES */}
+          {/* REGISTRO RÁPIDO (secretaria) / ALERTAS MÉDICO */}
+          {isDoctor ? (
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col space-y-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Resumen de Alertas</h2>
+                <p className="text-[10px] text-gray-500">Pacientes priorizados por nivel de urgencia.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'Crítico', count: triajeResumen?.rojo ?? 0, color: '#DC2626', bg: '#FEF2F2' },
+                  { label: 'Alto', count: triajeResumen?.naranja ?? 0, color: '#EA580C', bg: '#FFF7ED' },
+                  { label: 'Moderado', count: triajeResumen?.amarillo ?? 0, color: '#CA8A04', bg: '#FEFCE8' },
+                  { label: 'Bajo', count: triajeResumen?.verde ?? 0, color: '#16A34A', bg: '#F0FDF4' },
+                ].map(item => (
+                  <div key={item.label} className="rounded-xl p-3 border border-gray-100" style={{ backgroundColor: item.bg }}>
+                    <p className="text-[10px] font-bold uppercase" style={{ color: item.color }}>{item.label}</p>
+                    <p className="text-2xl font-extrabold" style={{ color: item.color }}>{item.count}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-gray-100 pt-3">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Citas por atender hoy</p>
+                {citasHoy.filter(c => c.estado === 'programada' || c.estado === 'en_atencion').length === 0 ? (
+                  <p className="text-xs text-gray-400">Sin citas pendientes de atención.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-40 overflow-y-auto">
+                    {citasHoy.filter(c => c.estado === 'programada' || c.estado === 'en_atencion').map(c => (
+                      <li key={c.id} className="flex items-center justify-between text-xs bg-slate-50 rounded-lg px-3 py-2 border border-gray-100">
+                        <span className="font-semibold text-gray-800 truncate">{c.paciente_nombre}</span>
+                        <span className="text-gray-400 font-mono ml-2 flex-shrink-0">{formatHour(c.fecha_hora)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <Link to="/triaje"
+                className="w-full py-2.5 px-4 text-xs font-bold text-white rounded-lg shadow-sm hover:opacity-90 text-center block"
+                style={{ backgroundColor: '#612853' }}>
+                Ir a Triaje
+              </Link>
+            </div>
+          ) : (
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex flex-col space-y-4">
             <div>
               <h2 className="text-sm font-bold text-gray-900">Registro Rápido de Pacientes</h2>
@@ -963,6 +1049,7 @@ export default function DashboardOverview() {
               </button>
             </form>
           </div>
+          )}
 
         </div>
 

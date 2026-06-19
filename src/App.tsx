@@ -6,10 +6,11 @@ import DashboardOverview from './features/dashboard/DashboardOverview';
 import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import { NavProvider } from './contexts/NavContext';
+import { PredictionPanel } from './features/risk-calculator/PredictionPanel';
+import TriajePage from './features/triaje/TriajePage';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
 const ADMIN_ROLES = ['administrador'];
-import {PredictionPanel} from './features/risk-calculator/PredictionPanel';
 
 const UnderConstruction = ({ title }: { title: string }) => (
   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50">
@@ -60,9 +61,9 @@ function App() {
               </ProtectedRoute>
             } />
           <Route path="/prediccion" element={
-            <SidebarLayout>
-              <PredictionPanel />
-            </SidebarLayout>
+            <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+              <SidebarLayout><PredictionPanel /></SidebarLayout>
+            </ProtectedRoute>
           } />
 
             {/* Módulo Pacientes */}
@@ -79,15 +80,9 @@ function App() {
             } />
 
             {/* Módulos clínicos (solo médico y administrador) */}
-            <Route path="/prediccion" element={
-              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
-                <SidebarLayout><UnderConstruction title="Predicción de Riesgo" /></SidebarLayout>
-              </ProtectedRoute>
-            } />
-
             <Route path="/triaje" element={
               <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
-                <SidebarLayout><UnderConstruction title="Módulo de Triaje" /></SidebarLayout>
+                <SidebarLayout><TriajePage /></SidebarLayout>
               </ProtectedRoute>
             } />
 

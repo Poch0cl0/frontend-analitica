@@ -286,4 +286,134 @@ export const getUltimaPrediccion = async (pacienteId: number): Promise<Prediccio
 export const ejecutarPrediccionConsenso = async (pacienteId: number): Promise<PrediccionConsensoResponse> => {
   const response = await api.post<PrediccionConsensoResponse>(`/api/prediccion/consenso/${pacienteId}`);
   return response.data;
+};
+
+// ==================== DATOS CLÍNICOS ====================
+
+export interface DatosClinicosResponse {
+  id: number;
+  paciente_id: number;
+  edad_gestacional_semanas: number | null;
+  longitud_cervical_mm: number | null;
+  embarazo_multiple: boolean;
+  parto_prematuro_previo: boolean;
+  hipertension_gestacional: boolean;
+  bmi: number | null;
+  bmi_categoria: string | null;
+  num_condiciones_cronicas: number;
+  infeccion_activa: boolean;
+  diabetes_pregestacional: boolean;
+  diabetes_gestacional: boolean;
+  hipertension_cronica: boolean;
+  eclampsia: boolean;
+  hepatitis_b: boolean;
+  hepatitis_c: boolean;
+  sifilis: boolean;
+  clamidia: boolean;
+  gonorrea: boolean;
+  cesareas_previas: boolean;
+  num_cesareas: number;
+  num_partos_previos_vivos: number;
+  alerta_activa: boolean;
+  notas_medicas: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DatosClinicosInput = Omit<DatosClinicosResponse, 'id' | 'paciente_id' | 'created_at' | 'updated_at'>;
+
+export const getDatosClinicos = async (pacienteId: number): Promise<DatosClinicosResponse> => {
+  const response = await api.get<DatosClinicosResponse>(`/api/datos-clinicos/${pacienteId}`);
+  return response.data;
+};
+
+export const createDatosClinicos = async (pacienteId: number, data: DatosClinicosInput): Promise<DatosClinicosResponse> => {
+  const response = await api.post<DatosClinicosResponse>(`/api/datos-clinicos/${pacienteId}`, data);
+  return response.data;
+};
+
+export const updateDatosClinicos = async (pacienteId: number, data: DatosClinicosInput): Promise<DatosClinicosResponse> => {
+  const response = await api.put<DatosClinicosResponse>(`/api/datos-clinicos/${pacienteId}`, data);
+  return response.data;
+};
+
+// ==================== USUARIO ACTUAL ====================
+
+export interface CurrentUser {
+  id: number;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  rol: string;
+}
+
+export const getCurrentUser = async (): Promise<CurrentUser> => {
+  const response = await api.get<CurrentUser>('/api/usuarios/me');
+  return response.data;
+};
+
+// ==================== HISTORIAL DE PREDICCIONES ====================
+
+export interface PrediccionHistorialItem {
+  id: number;
+  paciente_id: number;
+  prob_random_forest: number | null;
+  prob_catboost: number | null;
+  prob_logistica: number | null;
+  prob_consenso: number | null;
+  semanas_estimadas_rf: number | null;
+  semanas_estimadas_cb: number | null;
+  semanas_estimadas_logistica: number | null;
+  semanas_estimadas_consenso: number | null;
+  nivel_riesgo: string | null;
+  fecha_prediccion: string;
+}
+
+export const getHistorialPredicciones = async (pacienteId: number): Promise<PrediccionHistorialItem[]> => {
+  const response = await api.get<PrediccionHistorialItem[]>(`/api/prediccion/historial/${pacienteId}`);
+  return response.data;
+};
+
+// ==================== TRIAJE ====================
+
+export interface TriajeResumen {
+  rojo: number;
+  naranja: number;
+  amarillo: number;
+  verde: number;
+}
+
+export type TriajeAlgoritmo = 'consenso' | 'arbol' | 'ordinal';
+
+export interface TriajePriorizadoItem {
+  paciente_id: number;
+  nombre: string;
+  apellidos: string;
+  dni: string;
+  edad_gestacional_semanas: number | null;
+  nivel_urgencia: string;
+  score_formula_ponderada: number | null;
+  urgencia_arbol: string | null;
+  urgencia_ordinal: string | null;
+  prob_consenso: number | null;
+  semanas_estimadas_consenso: number | null;
+  bmi: number | null;
+  num_condiciones_cronicas: number | null;
+  fecha_triage: string;
+  acciones_urgentes: string[] | null;
+}
+
+export const getTriajeResumen = async (): Promise<TriajeResumen> => {
+  const response = await api.get<TriajeResumen>('/api/triage/resumen');
+  return response.data;
+};
+
+export const getTriajePriorizados = async (
+  nivel?: string,
+  algoritmo: TriajeAlgoritmo = 'consenso',
+): Promise<TriajePriorizadoItem[]> => {
+  const params: Record<string, string> = { algoritmo };
+  if (nivel) params.nivel = nivel;
+  const response = await api.get<TriajePriorizadoItem[]>('/api/triage/priorizados', { params });
+  return response.data;
 };
