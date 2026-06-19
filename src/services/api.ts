@@ -173,4 +173,72 @@ export const getPacientes = async (q?: string, page = 1, limit = 100): Promise<P
 export const createPaciente = async (data: PacienteCreate): Promise<PacienteResponse> => {
   const response = await api.post<PacienteResponse>('/api/pacientes/', data);
   return response.data;
+};
+
+// ==================== PREDICCIONES Y PERFIL DE PACIENTE ====================
+
+export interface ModeloConsensoItem {
+  prob_prematuro: number;
+  semanas_estimadas: number;
+}
+
+export interface ModelosConsenso {
+  random_forest: ModeloConsensoItem;
+  catboost: ModeloConsensoItem;
+  svm: ModeloConsensoItem;
+}
+
+export interface PrediccionUltimaResponse {
+  prediccion_id?: number | null;
+  prob_consenso?: number | null;
+  nivel_riesgo?: string | null;
+  modelos?: ModelosConsenso | null;
+  fecha_prediccion?: string | null;
+}
+
+export interface PrediccionConsensoResponse {
+  prediccion_id: number;
+  prob_consenso: number;
+  nivel_riesgo: string;
+  modelos: ModelosConsenso;
+}
+
+export interface PacientePerfilResponse {
+  id: number;
+  dni: string;
+  nombre: string;
+  apellidos: string;
+  telefono_principal?: string | null;
+  email?: string | null;
+  edad_madre?: number | null;
+  edad_gestacional_semanas?: number | null;
+  longitud_cervical_mm?: number | null;
+  embarazo_multiple?: boolean | null;
+  parto_prematuro_previo?: boolean | null;
+  hipertension_gestacional?: boolean | null;
+  bmi?: number | null;
+  num_condiciones_cronicas?: number | null;
+  infeccion_activa?: boolean | null;
+  prob_consenso?: number | null;
+  nivel_riesgo?: string | null;
+  semanas_estimadas_consenso?: number | null;
+  nivel_urgencia?: string | null;
+  medico_nombre?: string | null;
+  fecha_ultima_prediccion?: string | null;
+  fecha_ultimo_triage?: string | null;
+}
+
+export const getPacientePerfil = async (pacienteId: number): Promise<PacientePerfilResponse> => {
+  const response = await api.get<PacientePerfilResponse>(`/api/pacientes/${pacienteId}/perfil`);
+  return response.data;
+};
+
+export const getUltimaPrediccion = async (pacienteId: number): Promise<PrediccionUltimaResponse> => {
+  const response = await api.get<PrediccionUltimaResponse>(`/api/prediccion/paciente/${pacienteId}/ultima`);
+  return response.data;
+};
+
+export const ejecutarPrediccionConsenso = async (pacienteId: number): Promise<PrediccionConsensoResponse> => {
+  const response = await api.post<PrediccionConsensoResponse>(`/api/prediccion/consenso/${pacienteId}`);
+  return response.data;
 };
