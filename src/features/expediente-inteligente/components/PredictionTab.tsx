@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { usePrediccion } from '../hooks/usePrediccion';
+import PredictionFeedback from './PredictionFeedback';
+import ModelFeedback from './ModelFeedback';
 import {
   BrainCircuit, Activity, RefreshCw, Printer, Mail,
   AlertTriangle, CheckCircle2, ClipboardList, ChevronDown,
@@ -221,6 +223,9 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
                     <p className="text-xs font-bold text-slate-500">Parto: <span className="text-[#612853] font-black">{model.semanas_estimadas} sem</span></p>
                     <p className="text-[8px] text-slate-400 mt-0.5">IC 95%: {meta.ic95}</p>
                   </div>
+                  {prediction?.prediccion_id && (
+                    <ModelFeedback prediccionId={prediction.prediccion_id} modelo={modelKey} />
+                  )}
                 </div>
               );
             })}
@@ -259,6 +264,13 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
             </div>
           )}
         </div>
+      )}
+
+      {prediction?.prediccion_id && (
+        <PredictionFeedback
+          prediccionId={prediction.prediccion_id}
+          pacienteNombre={profile ? `${profile.nombre} ${profile.apellidos}` : ''}
+        />
       )}
 
       {emailMsg && (

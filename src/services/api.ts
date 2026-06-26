@@ -432,6 +432,52 @@ export const getHistorialPredicciones = async (pacienteId: number): Promise<Pred
   return response.data;
 };
 
+// ==================== PREDICCIÓN FEEDBACK ====================
+
+export interface PrediccionFeedbackResponse {
+  id: number;
+  prediccion_id: number;
+  medico_id: number;
+  modelo: string | null;
+  voto_correcta: boolean;
+  comentario: string | null;
+  created_at: string;
+}
+
+export interface PrediccionFeedbackInput {
+  voto_correcta: boolean;
+  comentario?: string;
+  modelo?: string;
+}
+
+export const getPrediccionFeedback = async (
+  prediccionId: number,
+  modelo?: string,
+): Promise<PrediccionFeedbackResponse | null> => {
+  try {
+    const params: Record<string, string> = {};
+    if (modelo) params.modelo = modelo;
+    const response = await api.get<PrediccionFeedbackResponse>(`/api/prediccion/${prediccionId}/feedback`, { params });
+    return response.data;
+  } catch (err: any) {
+    if (err?.response?.status === 404) return null;
+    throw err;
+  }
+};
+
+export const getPrediccionesFeedback = async (prediccionId: number): Promise<PrediccionFeedbackResponse[]> => {
+  const response = await api.get<PrediccionFeedbackResponse[]>(`/api/prediccion/${prediccionId}/feedback/todos`);
+  return response.data;
+};
+
+export const guardarPrediccionFeedback = async (
+  prediccionId: number,
+  data: PrediccionFeedbackInput,
+): Promise<PrediccionFeedbackResponse> => {
+  const response = await api.post<PrediccionFeedbackResponse>(`/api/prediccion/${prediccionId}/feedback`, data);
+  return response.data;
+};
+
 // ==================== TRIAJE ====================
 
 export interface TriajeResumen {

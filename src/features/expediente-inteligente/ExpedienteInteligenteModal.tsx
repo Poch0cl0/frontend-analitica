@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ExpedienteTab, ExpedienteInteligenteProps } from './types';
-import { Search, X, Calendar } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import PredictionTab from './components/PredictionTab';
 import TriageTab from './components/TriageTab';
 import RecommendationTab from './components/RecommendationTab';
@@ -20,16 +20,45 @@ export default function ExpedienteInteligenteModal({
   const [activeTab, setActiveTab] = useState<ExpedienteTab>('prediccion');
   const [selectedPacienteId, setSelectedPacienteId] = useState<number | null>(initialPacienteId ?? null);
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteResponse | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   // Patient search
   const [patients, setPatients] = useState<PacienteResponse[]>([]);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [patientError, setPatientError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    getPacientes('', 1, 200)
-      .then(res => setPatients(res.items))
-      .catch(() => {});
+    setLoadingPatients(true);
+    setPatientError(null);
+    getPacientes('', 1, 100)
+      .then(res => {
+        setPatients(res.items || []);
+        if (!res.items || res.items.length === 0) {
+          setPatientError('No hay pacientes registrados en el sistema.');
+        }
+      })
+      .catch(err => {
+        const detail = err?.response?.data?.detail;
+        const msg = Array.isArray(detail)
+          ? detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+          : detail || err?.message || 'Error de conexión con el backend.';
+        setPatientError(String(msg));
+        console.error('Error cargando pacientes:', err);
+      })
+      .finally(() => setLoadingPatients(false));
+  }, []);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
   useEffect(() => {
@@ -57,7 +86,7 @@ export default function ExpedienteInteligenteModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-5xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in"
+        className="bg-white rounded-2xl max-w-5xl w-full shadow-2xl border border-gray-100 flex flex-col animate-zoom-in"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -92,7 +121,7 @@ export default function ExpedienteInteligenteModal({
               </button>
             </div>
           ) : (
-            <div className="relative">
+            <div ref={searchRef} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -103,8 +132,16 @@ export default function ExpedienteInteligenteModal({
                 className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-300 bg-white"
               />
               {showDropdown && (
-                <div className="absolute z-30 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-gray-100">
-                  {filteredPatients.length > 0 ? (
+                <div className="absolute z-[70] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-gray-100">
+                  {loadingPatients ? (
+                    <div className="p-4 text-center text-xs font-medium text-gray-400 flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Cargando pacientes...
+                    </div>
+                  ) : patientError ? (
+                    <div className="p-4 text-center text-xs font-medium text-red-500">
+                      {patientError}
+                    </div>
+                  ) : filteredPatients.length > 0 ? (
                     filteredPatients.map(p => (
                       <button key={p.id} type="button" onClick={() => handleSelect(p)}
                         className="w-full text-left px-4 py-3 hover:bg-gray-50 transition flex items-center justify-between"
@@ -117,7 +154,9 @@ export default function ExpedienteInteligenteModal({
                       </button>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-xs font-medium text-gray-400">No se encontraron pacientes</div>
+                    <div className="p-4 text-center text-xs font-medium text-gray-400">
+                      {searchQuery ? 'No se encontraron pacientes con ese criterio.' : 'No hay pacientes registrados.'}
+                    </div>
                   )}
                 </div>
               )}
