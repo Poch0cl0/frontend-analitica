@@ -115,7 +115,8 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
     const cl = p.longitud_cervical_mm;
     vars.push({ label: 'Longitud Cervical', value: cl ? `${cl} mm` : 'N/A', isAlert: cl !== null && cl < 25, desc: cl !== null && cl < 25 ? 'Valor crítico (< 25mm)' : 'Valor normal' });
     vars.push({ label: 'Partos Prematuros Previos', value: p.parto_prematuro_previo ? 'Sí' : 'No', isAlert: !!p.parto_prematuro_previo, desc: p.parto_prematuro_previo ? 'Historial positivo' : 'Sin historial' });
-    vars.push({ label: 'Embarazo Múltiple', value: p.embarazo_multiple ? 'Sí' : 'No', isAlert: !!p.embarazo_multiple, desc: p.embarazo_multiple ? 'Factor de riesgo' : 'Monofetal' });
+    const multEmb = p.embarazo_multiple ?? 1;
+    vars.push({ label: 'Embarazo Múltiple', value: multEmb > 1 ? `Sí (${multEmb} fetos)` : 'No', isAlert: multEmb > 1, desc: multEmb > 1 ? 'Factor de riesgo' : 'Monofetal' });
     vars.push({ label: 'Hipertensión Gestacional', value: p.hipertension_gestacional ? 'Sí' : 'No', isAlert: !!p.hipertension_gestacional, desc: p.hipertension_gestacional ? 'Requiere control' : 'Sin hipertensión' });
     const bmi = p.bmi;
     vars.push({ label: 'BMI', value: bmi ? bmi.toString() : 'N/A', isAlert: bmi !== null && (bmi < 18.5 || bmi > 25), desc: bmi !== null && (bmi < 18.5 || bmi > 25) ? 'Fuera de rango' : 'Normal' });

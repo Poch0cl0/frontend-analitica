@@ -6,6 +6,7 @@ export const CHRONIC_CONDITION_FIELDS = [
   'diabetes_pregestacional',
   'diabetes_gestacional',
   'hipertension_cronica',
+  'hipertension_gestacional',
   'eclampsia',
 ] as const;
 
@@ -16,7 +17,7 @@ export interface DcAtenderForm {
   edad_gestacional_semanas: string;
   longitud_cervical_mm: string;
   bmi: string;
-  embarazo_multiple: boolean;
+  embarazo_multiple: string;
   parto_prematuro_previo: boolean;
   hipertension_gestacional: boolean;
   infeccion_activa: boolean;
@@ -24,6 +25,11 @@ export interface DcAtenderForm {
   diabetes_gestacional: boolean;
   hipertension_cronica: boolean;
   eclampsia: boolean;
+  gonorrea: boolean;
+  sifilis: boolean;
+  clamidia: boolean;
+  hepatitis_b: boolean;
+  hepatitis_c: boolean;
 }
 
 export const emptyAtenderForm: DcAtenderForm = {
@@ -31,7 +37,7 @@ export const emptyAtenderForm: DcAtenderForm = {
   edad_gestacional_semanas: '',
   longitud_cervical_mm: '',
   bmi: '',
-  embarazo_multiple: false,
+  embarazo_multiple: '1',
   parto_prematuro_previo: false,
   hipertension_gestacional: false,
   infeccion_activa: false,
@@ -39,10 +45,29 @@ export const emptyAtenderForm: DcAtenderForm = {
   diabetes_gestacional: false,
   hipertension_cronica: false,
   eclampsia: false,
+  gonorrea: false,
+  sifilis: false,
+  clamidia: false,
+  hepatitis_b: false,
+  hepatitis_c: false,
 };
+
+export const INFECTION_FIELDS = [
+  'gonorrea',
+  'sifilis',
+  'clamidia',
+  'hepatitis_b',
+  'hepatitis_c',
+] as const;
+
+export type InfectionField = typeof INFECTION_FIELDS[number];
 
 export function countCondicionesCronicas(form: Pick<DcAtenderForm, ChronicConditionField>): number {
   return CHRONIC_CONDITION_FIELDS.filter(field => form[field]).length;
+}
+
+export function hasActiveInfection(form: Pick<DcAtenderForm, InfectionField>): boolean {
+  return INFECTION_FIELDS.some(field => form[field]);
 }
 
 export function atenderFormFromResponse(
@@ -54,7 +79,7 @@ export function atenderFormFromResponse(
     edad_gestacional_semanas: dc.edad_gestacional_semanas != null ? String(dc.edad_gestacional_semanas) : '',
     longitud_cervical_mm: dc.longitud_cervical_mm != null ? String(dc.longitud_cervical_mm) : '',
     bmi: dc.bmi != null ? String(dc.bmi) : '',
-    embarazo_multiple: dc.embarazo_multiple,
+    embarazo_multiple: String(dc.embarazo_multiple),
     parto_prematuro_previo: dc.parto_prematuro_previo,
     hipertension_gestacional: dc.hipertension_gestacional,
     infeccion_activa: dc.infeccion_activa,
@@ -62,6 +87,11 @@ export function atenderFormFromResponse(
     diabetes_gestacional: dc.diabetes_gestacional,
     hipertension_cronica: dc.hipertension_cronica,
     eclampsia: dc.eclampsia,
+    gonorrea: dc.gonorrea,
+    sifilis: dc.sifilis,
+    clamidia: dc.clamidia,
+    hepatitis_b: dc.hepatitis_b,
+    hepatitis_c: dc.hepatitis_c,
   };
 }
 
@@ -73,22 +103,22 @@ export function atenderFormToPayload(
   return {
     edad_gestacional_semanas: form.edad_gestacional_semanas ? Number(form.edad_gestacional_semanas) : null,
     longitud_cervical_mm: form.longitud_cervical_mm ? Number(form.longitud_cervical_mm) : null,
-    embarazo_multiple: form.embarazo_multiple,
+    embarazo_multiple: Number(form.embarazo_multiple) || 1,
     parto_prematuro_previo: form.parto_prematuro_previo,
     hipertension_gestacional: form.hipertension_gestacional,
     bmi: form.bmi ? Number(form.bmi) : null,
     bmi_categoria: base?.bmi_categoria ?? null,
     num_condiciones_cronicas: countCondicionesCronicas(form),
-    infeccion_activa: form.infeccion_activa,
+    infeccion_activa: hasActiveInfection(form),
     diabetes_pregestacional: form.diabetes_pregestacional,
     diabetes_gestacional: form.diabetes_gestacional,
     hipertension_cronica: form.hipertension_cronica,
     eclampsia: form.eclampsia,
-    hepatitis_b: base?.hepatitis_b ?? false,
-    hepatitis_c: base?.hepatitis_c ?? false,
-    sifilis: base?.sifilis ?? false,
-    clamidia: base?.clamidia ?? false,
-    gonorrea: base?.gonorrea ?? false,
+    hepatitis_b: form.hepatitis_b,
+    hepatitis_c: form.hepatitis_c,
+    sifilis: form.sifilis,
+    clamidia: form.clamidia,
+    gonorrea: form.gonorrea,
     cesareas_previas: base?.cesareas_previas ?? false,
     num_cesareas: base?.num_cesareas ?? 0,
     num_partos_previos_vivos: base?.num_partos_previos_vivos ?? 0,
@@ -168,11 +198,18 @@ export function DcAtenderFormView({ form, onChange }: DcAtenderFormViewProps) {
           </div>
         </div>
 
-        <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-0.5">
+        <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Número de fetos (embarazo múltiple)</label>
+            <select value={form.embarazo_multiple} onChange={e => setField('embarazo_multiple', e.target.value)}
+              className={inputCls} style={{ borderColor: borderNormal }}>
+              <option value="1">1 feto</option>
+              <option value="2">2 fetos (gemelos)</option>
+              <option value="3">3 fetos (trillizos)</option>
+            </select>
+          </div>
           <ToggleRow label="Parto prematuro previo" field="parto_prematuro_previo" />
-          <ToggleRow label="Embarazo múltiple" field="embarazo_multiple" />
           <ToggleRow label="Hipertensión gestacional" field="hipertension_gestacional" />
-          <ToggleRow label="Infección activa" field="infeccion_activa" />
         </div>
       </div>
 
@@ -192,6 +229,24 @@ export function DcAtenderFormView({ form, onChange }: DcAtenderFormViewProps) {
         </div>
         <p className="text-[10px] text-gray-400 mt-1.5">Se calcula automáticamente al activar cada condición crónica.</p>
       </div>
+
+      <div>
+        <div className="flex items-center gap-2 mb-3 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
+          <span className="text-sm font-bold text-gray-800">Infecciones Activas</span>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 space-y-0.5">
+          <ToggleRow label="Gonorrea" field="gonorrea" />
+          <ToggleRow label="Sífilis" field="sifilis" />
+          <ToggleRow label="Clamidia" field="clamidia" />
+          <ToggleRow label="Hepatitis B" field="hepatitis_b" />
+          <ToggleRow label="Hepatitis C" field="hepatitis_c" />
+        </div>
+        <div className="mt-3 p-3 rounded-xl border border-fuchsia-100 bg-fuchsia-50/40 flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-600">Infección activa detectada</span>
+          <span className="text-lg font-extrabold" style={{ color: PRIMARY }}>{hasActiveInfection(form) ? 'Sí' : 'No'}</span>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1.5">Se calcula automáticamente al activar cada infección.</p>
+      </div>
     </div>
   );
 }
@@ -204,20 +259,26 @@ export function DcAtenderReadonlyView({ form }: DcAtenderReadonlyProps) {
   const chronicCount = countCondicionesCronicas(form);
   const boolLabel = (v: boolean) => (v ? 'Sí' : 'No');
 
+  const activeInfection = hasActiveInfection(form);
   const rows = [
     ['Edad de la madre', form.edad_madre ? `${form.edad_madre} años` : '—'],
     ['Parto prematuro previo', boolLabel(form.parto_prematuro_previo)],
-    ['Embarazo múltiple', boolLabel(form.embarazo_multiple)],
+    ['Embarazo múltiple', `${form.embarazo_multiple} feto(s)`],
     ['Hipertensión gestacional', boolLabel(form.hipertension_gestacional)],
     ['Edad gestacional', form.edad_gestacional_semanas ? `${form.edad_gestacional_semanas} semanas` : '—'],
     ['Condiciones crónicas relevantes', String(chronicCount)],
     ['Longitud cervical', form.longitud_cervical_mm ? `${form.longitud_cervical_mm} mm` : '—'],
     ['IMC', form.bmi || '—'],
-    ['Infección activa', boolLabel(form.infeccion_activa)],
+    ['Infección activa', boolLabel(activeInfection)],
     ['Diabetes pregestacional', boolLabel(form.diabetes_pregestacional)],
     ['Diabetes gestacional', boolLabel(form.diabetes_gestacional)],
     ['Hipertensión crónica', boolLabel(form.hipertension_cronica)],
     ['Eclampsia', boolLabel(form.eclampsia)],
+    ['Gonorrea', boolLabel(form.gonorrea)],
+    ['Sífilis', boolLabel(form.sifilis)],
+    ['Clamidia', boolLabel(form.clamidia)],
+    ['Hepatitis B', boolLabel(form.hepatitis_b)],
+    ['Hepatitis C', boolLabel(form.hepatitis_c)],
   ];
 
   return (

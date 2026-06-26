@@ -333,11 +333,12 @@ export const PredictionPanel: React.FC = () => {
     });
 
     // Embarazo Múltiple
+    const mult = p.embarazo_multiple ?? 1;
     vars.push({
       label: 'Embarazo Múltiple',
-      value: p.embarazo_multiple ? 'Sí' : 'No',
-      isAlert: !!p.embarazo_multiple,
-      desc: p.embarazo_multiple ? 'Factor de riesgo' : 'Monofetal'
+      value: mult > 1 ? `Sí (${mult} fetos)` : 'No',
+      isAlert: mult > 1,
+      desc: mult > 1 ? `Factor de riesgo (${mult} fetos)` : 'Monofetal'
     });
 
     // Hipertensión Gestacional

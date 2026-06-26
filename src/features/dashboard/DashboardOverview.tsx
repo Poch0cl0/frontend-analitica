@@ -16,6 +16,8 @@ import {
   getTriajeResumen,
   createDatosClinicos,
   updateDatosClinicos,
+  createAndAnalizarDatosClinicos,
+  updateAndAnalizarDatosClinicos,
 } from '../../services/api';
 import type {
   DashboardResumen,
@@ -49,7 +51,7 @@ interface PacientePerfilResponse {
   edad_madre: number | null;
   edad_gestacional_semanas: number | null;
   longitud_cervical_mm: number | null;
-  embarazo_multiple: boolean | null;
+  embarazo_multiple: number | null;
   parto_prematuro_previo: boolean | null;
   hipertension_gestacional: boolean | null;
   bmi: number | null;
@@ -212,6 +214,16 @@ export default function DashboardOverview() {
   useEffect(() => {
     loadData();
   }, [location.pathname]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const expedienteId = params.get('expediente');
+    if (expedienteId) {
+      setExpedientePacienteId(Number(expedienteId));
+      setShowExpedienteModal(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.search]);
 
   const showToastMsg = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -505,17 +517,19 @@ export default function DashboardOverview() {
     try {
       const payload = atenderFormToPayload(atenderDcForm, existingDc);
       if (dcExists) {
-        await updateDatosClinicos(selectedCitaDetail.paciente_id, payload);
+        await updateAndAnalizarDatosClinicos(selectedCitaDetail.paciente_id, payload);
       } else {
-        await createDatosClinicos(selectedCitaDetail.paciente_id, payload);
+        await createAndAnalizarDatosClinicos(selectedCitaDetail.paciente_id, payload);
         setDcExists(true);
       }
       await changeCitaEstado(selectedCitaDetail.id, 'cumplida');
-      showToastMsg('Cita atendida y datos clínicos guardados correctamente', 'success');
+      showToastMsg('Cita atendida — predicción, triaje y recomendaciones generados', 'success');
       setActiveModal(null);
       setSelectedCitaDetail(null);
       setSelectedCitaId(null);
       await loadData(false);
+      setExpedientePacienteId(selectedCitaDetail.paciente_id);
+      setShowExpedienteModal(true);
     } catch (err: any) {
       console.error(err);
       showToastMsg(err?.response?.data?.detail || 'Error al atender la cita', 'error');
@@ -1568,10 +1582,10 @@ export default function DashboardOverview() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs p-3.5 bg-gray-50 rounded-xl border border-gray-100">
                       
                       <div className="flex items-center gap-2 font-semibold">
-                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] text-white ${selectedPatientPerfil.embarazo_multiple ? 'bg-fuchsia-900' : 'bg-gray-200'}`}>
-                          {selectedPatientPerfil.embarazo_multiple ? '✓' : ''}
+                        <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] text-white ${(selectedPatientPerfil.embarazo_multiple ?? 1) > 1 ? 'bg-fuchsia-900' : 'bg-gray-200'}`}>
+                          {(selectedPatientPerfil.embarazo_multiple ?? 1) > 1 ? '✓' : ''}
                         </span>
-                        <span className={selectedPatientPerfil.embarazo_multiple ? 'text-gray-900' : 'text-gray-400'}>Embarazo Múltiple</span>
+                        <span className={(selectedPatientPerfil.embarazo_multiple ?? 1) > 1 ? 'text-gray-900' : 'text-gray-400'}>Embarazo Múltiple</span>
                       </div>
 
                       <div className="flex items-center gap-2 font-semibold">

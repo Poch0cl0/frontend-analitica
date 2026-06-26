@@ -257,7 +257,7 @@ export interface PacientePerfilResponse {
   edad_madre?: number | null;
   edad_gestacional_semanas?: number | null;
   longitud_cervical_mm?: number | null;
-  embarazo_multiple?: boolean | null;
+  embarazo_multiple?: number | null;
   parto_prematuro_previo?: boolean | null;
   hipertension_gestacional?: boolean | null;
   bmi?: number | null;
@@ -294,7 +294,7 @@ export interface DatosClinicosResponse {
   paciente_id: number;
   edad_gestacional_semanas: number | null;
   longitud_cervical_mm: number | null;
-  embarazo_multiple: boolean;
+  embarazo_multiple: number;
   parto_prematuro_previo: boolean;
   hipertension_gestacional: boolean;
   bmi: number | null;
@@ -333,6 +333,26 @@ export const createDatosClinicos = async (pacienteId: number, data: DatosClinico
 
 export const updateDatosClinicos = async (pacienteId: number, data: DatosClinicosInput): Promise<DatosClinicosResponse> => {
   const response = await api.put<DatosClinicosResponse>(`/api/datos-clinicos/${pacienteId}`, data);
+  return response.data;
+};
+
+export interface AnalizarResponse {
+  datos_clinicos: DatosClinicosResponse;
+  prediccion: {
+    prediccion_id: number;
+    prob_consenso: number;
+    nivel_riesgo: string;
+    modelos: ModelosConsenso;
+  };
+}
+
+export const createAndAnalizarDatosClinicos = async (pacienteId: number, data: DatosClinicosInput): Promise<AnalizarResponse> => {
+  const response = await api.post<AnalizarResponse>(`/api/datos-clinicos/${pacienteId}/analizar`, data);
+  return response.data;
+};
+
+export const updateAndAnalizarDatosClinicos = async (pacienteId: number, data: DatosClinicosInput): Promise<AnalizarResponse> => {
+  const response = await api.put<AnalizarResponse>(`/api/datos-clinicos/${pacienteId}/analizar`, data);
   return response.data;
 };
 

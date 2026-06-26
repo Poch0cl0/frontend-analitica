@@ -13,6 +13,8 @@ import {
   getPacientes,
   createDatosClinicos,
   updateDatosClinicos,
+  createAndAnalizarDatosClinicos,
+  updateAndAnalizarDatosClinicos,
   type DatosClinicosResponse,
 } from '../../services/api';
 import type {
@@ -209,22 +211,16 @@ export default function CitasPage() {
     try {
       const payload = atenderFormToPayload(atenderDcForm, existingDc);
       if (dcExists) {
-        await updateDatosClinicos(selectedCitaDetail.paciente_id, payload);
+        await updateAndAnalizarDatosClinicos(selectedCitaDetail.paciente_id, payload);
       } else {
-        await createDatosClinicos(selectedCitaDetail.paciente_id, payload);
-        setDcExists(true);
+        await createAndAnalizarDatosClinicos(selectedCitaDetail.paciente_id, payload);
       }
       await changeCitaEstado(selectedCitaDetail.id, 'cumplida');
-      showToast(
-        dcExists
-          ? 'Datos clínicos actualizados y cita marcada como atendida'
-          : 'Cita atendida y datos clínicos guardados correctamente',
-        'success',
-      );
+      showToast('Cita atendida — predicción, triaje y recomendaciones generados', 'success');
       setActiveModal(null);
       setSelectedCitaDetail(null);
       setSelectedCitaId(null);
-      await loadCitas();
+      navigate(`/dashboard?expediente=${selectedCitaDetail.paciente_id}`);
     } catch (err: any) {
       showToast(err?.response?.data?.detail || 'Error al atender la cita', 'error');
     } finally {

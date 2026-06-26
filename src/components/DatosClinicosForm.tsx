@@ -5,7 +5,7 @@ const PRIMARY = '#612853';
 export interface DcForm {
   edad_gestacional_semanas: string;
   longitud_cervical_mm: string;
-  embarazo_multiple: boolean;
+  embarazo_multiple: string;
   parto_prematuro_previo: boolean;
   hipertension_gestacional: boolean;
   bmi: string;
@@ -30,7 +30,7 @@ export interface DcForm {
 
 export const emptyDcForm: DcForm = {
   edad_gestacional_semanas: '', longitud_cervical_mm: '',
-  embarazo_multiple: false, parto_prematuro_previo: false,
+  embarazo_multiple: '1', parto_prematuro_previo: false,
   hipertension_gestacional: false, bmi: '', bmi_categoria: '',
   num_condiciones_cronicas: '0', infeccion_activa: false,
   diabetes_pregestacional: false, diabetes_gestacional: false,
@@ -55,7 +55,7 @@ export function dcFromResponse(dc: DatosClinicosResponse): DcForm {
   return {
     edad_gestacional_semanas: dc.edad_gestacional_semanas !== null ? String(dc.edad_gestacional_semanas) : '',
     longitud_cervical_mm: dc.longitud_cervical_mm !== null ? String(dc.longitud_cervical_mm) : '',
-    embarazo_multiple: dc.embarazo_multiple,
+    embarazo_multiple: String(dc.embarazo_multiple),
     parto_prematuro_previo: dc.parto_prematuro_previo,
     hipertension_gestacional: dc.hipertension_gestacional,
     bmi: dc.bmi !== null ? String(dc.bmi) : '',
@@ -83,7 +83,7 @@ export function dcToPayload(form: DcForm): DatosClinicosInput {
   return {
     edad_gestacional_semanas: form.edad_gestacional_semanas ? Number(form.edad_gestacional_semanas) : null,
     longitud_cervical_mm: form.longitud_cervical_mm ? Number(form.longitud_cervical_mm) : null,
-    embarazo_multiple: form.embarazo_multiple,
+    embarazo_multiple: Number(form.embarazo_multiple) || 1,
     parto_prematuro_previo: form.parto_prematuro_previo,
     hipertension_gestacional: form.hipertension_gestacional,
     bmi: form.bmi ? Number(form.bmi) : null,
@@ -181,8 +181,18 @@ export function DcFormView({ form, onChange }: DcFormViewProps) {
           </div>
         </div>
 
-        <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-0.5">
-          <ToggleRow label="Embarazo múltiple (gemelos, etc.)" field="embarazo_multiple" />
+        <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Número de fetos (embarazo múltiple)</label>
+            <select value={form.embarazo_multiple} onChange={e => onChange('embarazo_multiple', e.target.value)}
+              className={inputCls} style={{ borderColor: borderNormal }}
+              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
+              onBlur={e => e.currentTarget.style.borderColor = borderNormal}>
+              <option value="1">1 feto</option>
+              <option value="2">2 fetos (gemelos)</option>
+              <option value="3">3 fetos (trillizos)</option>
+            </select>
+          </div>
           <ToggleRow label="Parto prematuro previo" field="parto_prematuro_previo" />
         </div>
       </div>
