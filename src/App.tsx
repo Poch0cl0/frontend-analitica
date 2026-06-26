@@ -6,6 +6,7 @@ import DashboardOverview from './features/dashboard/DashboardOverview';
 import CitasPage from './features/citas/CitasPage';
 import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
+import TriajePage from './features/triaje/TriajePage';
 import { NavProvider } from './contexts/NavContext';
 import { RecommendationsList } from './features/recomendations/RecomendationsList';
 import FeedbackAnalytics from './features/feedback/FeedbackAnalytics';
@@ -72,6 +73,13 @@ function App() {
             <Route path="/pacientes/:id" element={
               <ProtectedRoute>
                 <SidebarLayout><PacienteDetalle /></SidebarLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Triaje (solo médico y administrador) */}
+            <Route path="/triaje" element={
+              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+                <SidebarLayout><TriajePage /></SidebarLayout>
               </ProtectedRoute>
             } />
 

@@ -14,6 +14,8 @@ import {
   getDatosClinicos,
   createDatosClinicos,
   updateDatosClinicos,
+  createAndAnalizarDatosClinicos,
+  updateAndAnalizarDatosClinicos,
 } from '../../services/api';
 import type {
   PacienteResponse,
@@ -32,6 +34,7 @@ import {
   type DcAtenderForm,
 } from '../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
+import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
 
 const PRIMARY = '#612853';
 
@@ -247,6 +250,10 @@ export default function PacienteDetalle() {
     fecha: '', hora: '', medico_id: '', duracion_minutos: 30, notas: '',
   });
 
+  // Expediente Inteligente Modal
+  const [showExpedienteModal, setShowExpedienteModal] = useState(false);
+  const [expedientePacienteId, setExpedientePacienteId] = useState<number | null>(null);
+
   // Atender cita modal (médico)
   const [atenderCita, setAtenderCita] = useState<CitaResponseEnriquecida | null>(null);
   const [atenderDcForm, setAtenderDcForm] = useState<DcAtenderForm>(emptyAtenderForm);
@@ -319,16 +326,18 @@ export default function PacienteDetalle() {
     setIsSavingDc(true);
     try {
       const payload = atenderFormToPayload(dcForm, datosClinicos);
-      let saved: DatosClinicosResponse;
       if (dcExists) {
-        saved = await updateDatosClinicos(paciente.id, payload);
+        await updateAndAnalizarDatosClinicos(paciente.id, payload);
       } else {
-        saved = await createDatosClinicos(paciente.id, payload);
+        await createAndAnalizarDatosClinicos(paciente.id, payload);
         setDcExists(true);
       }
-      setDatosClinicos(saved);
-      setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
-      showToast('Datos clínicos guardados correctamente', 'success');
+      const dc = await getDatosClinicos(paciente.id);
+      setDatosClinicos(dc);
+      setDcForm(atenderFormFromResponse(dc, calcEdad(paciente.fecha_nacimiento)));
+      showToast('Datos clínicos guardados — predicción, triaje y recomendaciones generados', 'success');
+      setExpedientePacienteId(paciente.id);
+      setShowExpedienteModal(true);
     } catch (err: any) {
       showToast(err?.response?.data?.detail || 'Error al guardar datos clínicos', 'error');
     } finally {
@@ -358,18 +367,19 @@ export default function PacienteDetalle() {
     try {
       const payload = atenderFormToPayload(atenderDcForm, atenderExistingDc);
       if (dcExists) {
-        const saved = await updateDatosClinicos(paciente.id, payload);
-        setDatosClinicos(saved);
-        setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
+        await updateAndAnalizarDatosClinicos(paciente.id, payload);
       } else {
-        const saved = await createDatosClinicos(paciente.id, payload);
-        setDatosClinicos(saved);
+        await createAndAnalizarDatosClinicos(paciente.id, payload);
         setDcExists(true);
-        setDcForm(atenderFormFromResponse(saved, calcEdad(paciente.fecha_nacimiento)));
       }
+      const dc = await getDatosClinicos(paciente.id);
+      setDatosClinicos(dc);
+      setDcForm(atenderFormFromResponse(dc, calcEdad(paciente.fecha_nacimiento)));
       await changeCitaEstado(atenderCita.id, 'cumplida');
-      showToast('Cita marcada como atendida y datos clínicos guardados', 'success');
+      showToast('Cita atendida — predicción, triaje y recomendaciones generados', 'success');
       setAtenderCita(null);
+      setExpedientePacienteId(paciente.id);
+      setShowExpedienteModal(true);
       await reloadCitas();
     } catch (err: any) {
       showToast(err?.response?.data?.detail || 'Error al atender la cita', 'error');
@@ -1004,6 +1014,14 @@ export default function PacienteDetalle() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── EXPEDIENTE INTELIGENTE ─────────────────────────────────────────── */}
+      {showExpedienteModal && (
+        <ExpedienteInteligenteModal
+          pacienteId={expedientePacienteId}
+          onClose={() => { setShowExpedienteModal(false); setExpedientePacienteId(null); }}
+        />
       )}
 
       {/* ── ATENDER CITA (médico) ─────────────────────────────────────────── */}

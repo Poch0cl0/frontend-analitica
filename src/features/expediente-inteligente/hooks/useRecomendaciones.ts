@@ -10,7 +10,6 @@ export function useRecomendaciones(pacienteId: number | null) {
   const [recomendaciones, setRecomendaciones] = useState<RecomendacionResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [modelo, setModelo] = useState<string>('random_forest');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -52,13 +51,8 @@ export function useRecomendaciones(pacienteId: number | null) {
     }
   }, [pacienteId]);
 
-  const filtradas = recomendaciones.filter(r => r.algoritmo === modelo);
-
   return {
     recomendaciones,
-    filtradas,
-    modelo,
-    setModelo,
     loading,
     generating,
     error,

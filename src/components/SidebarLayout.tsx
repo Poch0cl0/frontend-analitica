@@ -7,7 +7,7 @@ interface SidebarLayoutProps {
   children: ReactNode;
 }
 
-type IconKey = 'LayoutDashboard' | 'Calendar' | 'Users' | 'HeartPulse' | 'ShieldAlert' | 'BarChart3';
+type IconKey = 'LayoutDashboard' | 'Calendar' | 'Users' | 'HeartPulse' | 'ShieldAlert' | 'BarChart3' | 'TriangleAlert';
 
 interface MenuItem {
   label: string;
@@ -35,6 +35,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'MÓDULOS CLÍNICOS',
     items: [
+      { label: 'Triaje', path: '/triaje', icon: 'TriangleAlert', roles: ['medico', 'administrador'] },
       { label: 'Recomendaciones', path: '/recomendaciones', icon: 'HeartPulse', roles: ['medico', 'administrador'] },
       { label: 'Rendimiento Modelos', path: '/feedback', icon: 'BarChart3', roles: ['medico', 'administrador'] },
     ],
@@ -51,6 +52,7 @@ const routeInfo: Record<string, { title: string; section: string }> = {
   '/dashboard': { title: 'Dashboard', section: 'Principal' },
   '/citas': { title: 'Citas', section: 'Principal' },
   '/pacientes': { title: 'Pacientes', section: 'Principal' },
+  '/triaje': { title: 'Sistema de Priorización por Urgencia', section: 'Módulos Clínicos' },
   '/recomendaciones': { title: 'Recomendaciones', section: 'Módulos Clínicos' },
   '/feedback': { title: 'Rendimiento de Modelos', section: 'Módulos Clínicos' },
   '/usuarios': { title: 'Usuarios', section: 'Gestión' },
@@ -85,6 +87,11 @@ const icons: Record<IconKey, (className?: string) => JSX.Element> = {
   BarChart3: (className = 'w-5 h-5') => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  TriangleAlert: (className = 'w-5 h-5') => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
   ),
 };

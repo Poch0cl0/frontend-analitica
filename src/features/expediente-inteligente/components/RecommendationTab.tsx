@@ -1,18 +1,12 @@
 import { useRecomendaciones } from '../hooks/useRecomendaciones';
-import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface RecommendationTabProps {
   pacienteId: number;
 }
 
-const MODELOS: { key: string; label: string }[] = [
-  { key: 'random_forest', label: 'Random Forest (S-4)' },
-  { key: 'cart', label: 'Árbol de Decisión (CART)' },
-  { key: 'if_then', label: 'Reglas Si-Entonces' },
-];
-
 export default function RecommendationTab({ pacienteId }: RecommendationTabProps) {
-  const { filtradas, modelo, setModelo, loading, generating, error, generar } = useRecomendaciones(pacienteId);
+  const { recomendaciones, loading, generating, error, generar } = useRecomendaciones(pacienteId);
 
   if (loading) {
     return (
@@ -32,44 +26,52 @@ export default function RecommendationTab({ pacienteId }: RecommendationTabProps
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-1.5 rounded-xl">
-          <select
-            value={modelo}
-            onChange={e => setModelo(e.target.value)}
-            disabled={generating || loading}
-            className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer py-0.5 px-2 disabled:opacity-50"
-          >
-            {MODELOS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
-          </select>
-        </div>
+      <div className="flex items-center justify-end">
         <button onClick={generar} disabled={generating || loading}
           className="px-4 py-2 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40 shadow-sm flex items-center gap-2"
           style={{ backgroundColor: '#612853' }}>
-          {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generando...</> : 'Generar Recomendaciones'}
+          {generating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generando...</> : <><Sparkles className="w-4 h-4" /> Generar Recomendación con IA</>}
         </button>
       </div>
 
-      {filtradas.length === 0 ? (
+      {recomendaciones.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center space-y-3">
+          <div className="w-14 h-14 mx-auto rounded-full bg-fuchsia-50 flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-fuchsia-700" />
+          </div>
           <p className="text-gray-600 font-medium">No hay recomendaciones registradas para esta paciente.</p>
-          <p className="text-xs text-gray-400">Presione el botón "Generar Recomendaciones" para ejecutar el módulo S-4.</p>
+          <p className="text-xs text-gray-400">Presione "Generar Recomendación con IA" para obtener una recomendación clínica basada en los datos de la paciente mediante inteligencia artificial.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filtradas.map((rec: any) => (
-            <div key={rec.id || rec.recomendacion_id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900">{rec.titulo || rec.intervencion?.nombre || rec.recomendacion}</h3>
-                  <p className="text-[10px] text-gray-500">{rec.intervencion?.categoria || rec.intervencion?.codigo || 'Automatizada'}</p>
+        <div className="space-y-4">
+          {recomendaciones.map((rec: any) => (
+            <div key={rec.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-fuchsia-600 shrink-0" />
+                  <h3 className="text-sm font-extrabold text-gray-900">{rec.titulo || rec.intervencion?.nombre}</h3>
                 </div>
                 <span className="text-[9px] font-bold px-2.5 py-1 rounded-full bg-fuchsia-50 text-fuchsia-900 border border-fuchsia-100 uppercase">
                   {rec.estado || 'Activo'}
                 </span>
               </div>
-              {rec.descripcion && <p className="text-xs text-gray-700 leading-relaxed">{rec.descripcion}</p>}
-              {rec.notas && <p className="text-[11px] text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">{rec.notas}</p>}
+              {rec.algoritmo === 'gemini' && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border border-blue-100">
+                  <Sparkles className="w-3 h-3" /> Generado por IA
+                </div>
+              )}
+              {rec.descripcion && (
+                <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">{rec.descripcion}</p>
+              )}
+              {rec.notas && (
+                <p className="text-[11px] text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">{rec.notas}</p>
+              )}
+              {rec.intervencion?.categoria && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Tipo:</span>
+                  <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{rec.intervencion.categoria}</span>
+                </div>
+              )}
               <p className="text-[9px] text-gray-400">
                 {rec.fecha_recomendacion
                   ? new Date(rec.fecha_recomendacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
