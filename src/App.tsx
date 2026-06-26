@@ -8,6 +8,7 @@ import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import { NavProvider } from './contexts/NavContext';
 import { RecommendationsList } from './features/recomendations/RecomendationsList';
+import FeedbackAnalytics from './features/feedback/FeedbackAnalytics';
 import UsuariosPage from './features/usuarios/UsuariosPage';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
@@ -78,6 +79,12 @@ function App() {
             <Route path="/recomendaciones" element={
               <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
                 <SidebarLayout><RecommendationsList/></SidebarLayout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/feedback" element={
+              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+                <SidebarLayout><FeedbackAnalytics /></SidebarLayout>
               </ProtectedRoute>
             } />
 

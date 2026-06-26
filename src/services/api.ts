@@ -478,6 +478,38 @@ export const guardarPrediccionFeedback = async (
   return response.data;
 };
 
+// ==================== FEEDBACK ESTADÍSTICAS ====================
+
+export interface FeedbackPorModelo {
+  modelo: string | null;
+  total: number;
+  correctos: number;
+  incorrectos: number;
+  precision: number;
+}
+
+export interface FeedbackTemporal {
+  fecha: string;
+  total: number;
+  correctos: number;
+  incorrectos: number;
+  precision: number;
+}
+
+export interface FeedbackEstadisticasResponse {
+  total_votos: number;
+  total_correctos: number;
+  total_incorrectos: number;
+  precision_global: number;
+  por_modelo: FeedbackPorModelo[];
+  temporal: FeedbackTemporal[];
+}
+
+export const getFeedbackEstadisticas = async (): Promise<FeedbackEstadisticasResponse> => {
+  const response = await api.get<FeedbackEstadisticasResponse>('/api/prediccion/feedback/estadisticas');
+  return response.data;
+};
+
 // ==================== TRIAJE ====================
 
 export interface TriajeResumen {
