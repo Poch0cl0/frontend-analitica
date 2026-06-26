@@ -35,6 +35,7 @@ import {
 } from '../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import type { DatosClinicosResponse } from '../../services/api';
+import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
 
 // ==================== TIPOS ADICIONALES ====================
 
@@ -96,6 +97,10 @@ export default function DashboardOverview() {
   const [selectedPatientPerfil, setSelectedPatientPerfil] = useState<PacientePerfilResponse | null>(null);
   const [isLoadingPerfil, setIsLoadingPerfil] = useState<boolean>(false);
   const [preselectedPatientId, setPreselectedPatientId] = useState<number | null>(null);
+
+  // Expediente Inteligente Modal
+  const [showExpedienteModal, setShowExpedienteModal] = useState(false);
+  const [expedientePacienteId, setExpedientePacienteId] = useState<number | null>(null);
 
   // Atender cita (médico)
   const [atenderDcForm, setAtenderDcForm] = useState<DcAtenderForm>(emptyAtenderForm);
@@ -679,18 +684,32 @@ export default function DashboardOverview() {
               : 'Gestión de citas y monitoreo de alertas de parto prematuro en tiempo real.'}
           </p>
         </div>
-        {!isDoctor && (
-        <button 
-          onClick={() => handleOpenCreateModal()}
-          className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150"
-          style={{ backgroundColor: '#612853' }}
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Agendar Nueva Cita</span>
-        </button>
-        )}
+        <div className="flex items-center gap-3">
+          {(isDoctor || localStorage.getItem('user_role') === 'administrador') && (
+            <button
+              onClick={() => setShowExpedienteModal(true)}
+              className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150"
+              style={{ backgroundColor: '#612853' }}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              <span>Expediente Inteligente</span>
+            </button>
+          )}
+          {!isDoctor && (
+          <button 
+            onClick={() => handleOpenCreateModal()}
+            className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150"
+            style={{ backgroundColor: '#612853' }}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Agendar Nueva Cita</span>
+          </button>
+          )}
+        </div>
       </div>
 
       {/* FILA DE TARJETAS KPI (4) */}
@@ -1729,6 +1748,14 @@ export default function DashboardOverview() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ==================== MODAL: EXPEDIENTE INTELIGENTE ==================== */}
+      {showExpedienteModal && (
+        <ExpedienteInteligenteModal
+          pacienteId={expedientePacienteId}
+          onClose={() => { setShowExpedienteModal(false); setExpedientePacienteId(null); }}
+        />
       )}
 
       {/* ==================== MODAL: PACIENTES SIN CITA ==================== */}
