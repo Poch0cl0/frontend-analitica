@@ -74,6 +74,7 @@ export default function PacientesPage() {
   const [filterEstado, setFilterEstado] = useState('');
   const [filterMedico, setFilterMedico] = useState('');
   const [filterMes, setFilterMes] = useState('');
+  const [filterFechaRegistro, setFilterFechaRegistro] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
@@ -101,7 +102,8 @@ export default function PacientesPage() {
           q: search || undefined,
           estado: filterEstado || undefined,
           medico_id: (!isDoctor && filterMedico) ? Number(filterMedico) : undefined,
-          mes_registro: filterMes ? Number(filterMes) : undefined,
+          mes_registro: filterFechaRegistro ? undefined : (filterMes ? Number(filterMes) : undefined),
+          fecha_registro: filterFechaRegistro || undefined,
           page, limit,
         }),
         getPacientesFiltered({ estado: 'sin_medico', limit: 1 }),
@@ -115,7 +117,7 @@ export default function PacientesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [search, filterEstado, filterMedico, filterMes, page, limit, isDoctor]);
+  }, [search, filterEstado, filterMedico, filterMes, filterFechaRegistro, page, limit, isDoctor]);
 
   useEffect(() => {
     const init = async () => {
@@ -369,8 +371,21 @@ export default function PacientesPage() {
             </select>
           )}
 
+          {/* Fecha de registro */}
+          <input
+            type="date"
+            value={filterFechaRegistro}
+            onChange={e => {
+              setFilterFechaRegistro(e.target.value);
+              if (e.target.value) setFilterMes('');
+              setPage(1);
+            }}
+            title="Fecha de registro"
+            className={inputCls}
+          />
+
           {/* Mes */}
-          <select value={filterMes} onChange={e => { setFilterMes(e.target.value); setPage(1); }}
+          <select value={filterMes} onChange={e => { setFilterMes(e.target.value); if (e.target.value) setFilterFechaRegistro(''); setPage(1); }}
             className={inputCls}>
             <option value="">Mes de Registro</option>
             {MESES.map((mes, i) => <option key={i+1} value={i+1}>{mes}</option>)}

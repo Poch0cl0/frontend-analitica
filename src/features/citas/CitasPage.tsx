@@ -61,8 +61,7 @@ export default function CitasPage() {
   const [dcExists, setDcExists] = useState(false);
   const [isSavingAtender, setIsSavingAtender] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterFechaDesde, setFilterFechaDesde] = useState('');
-  const [filterFechaHasta, setFilterFechaHasta] = useState('');
+  const [filterFecha, setFilterFecha] = useState('');
   const [filterEstado, setFilterEstado] = useState('');
   const [editCitaForm, setEditCitaForm] = useState<EditCitaForm>({
     fecha: '', hora: '', medico_id: '', estado: 'programada', notas: '', duracion_minutos: 30,
@@ -81,8 +80,7 @@ export default function CitasPage() {
 
   const handleIrACitasFecha = useCallback((fecha: string) => {
     setActiveTab('lista');
-    setFilterFechaDesde(fecha);
-    setFilterFechaHasta(fecha);
+    setFilterFecha(fecha);
     setFilterEstado('');
     setSearchQuery('');
   }, []);
@@ -93,11 +91,9 @@ export default function CitasPage() {
     try {
       const requests: Promise<unknown>[] = [
         getCitas(
-          undefined,
+          filterFecha || undefined,
           undefined,
           filterEstado || undefined,
-          filterFechaDesde || undefined,
-          filterFechaHasta || undefined,
         ),
         getMedicos(),
       ];
@@ -110,7 +106,7 @@ export default function CitasPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [filterFechaDesde, filterFechaHasta, filterEstado, isDoctor]);
+  }, [filterFecha, filterEstado, isDoctor]);
 
   useEffect(() => { loadCitas(); }, [loadCitas]);
 
@@ -361,9 +357,9 @@ export default function CitasPage() {
       {(isDoctor || activeTab === 'lista') && (
         <>
       <CitasFilters
-        searchQuery={searchQuery} filterFechaDesde={filterFechaDesde} filterFechaHasta={filterFechaHasta} filterEstado={filterEstado}
-        onSearchChange={setSearchQuery} onFechaDesdeChange={setFilterFechaDesde} onFechaHastaChange={setFilterFechaHasta} onEstadoChange={setFilterEstado}
-        onClear={() => { setSearchQuery(''); setFilterFechaDesde(''); setFilterFechaHasta(''); setFilterEstado(''); }}
+        searchQuery={searchQuery} filterFecha={filterFecha} filterEstado={filterEstado}
+        onSearchChange={setSearchQuery} onFechaChange={setFilterFecha} onEstadoChange={setFilterEstado}
+        onClear={() => { setSearchQuery(''); setFilterFecha(''); setFilterEstado(''); }}
       />
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

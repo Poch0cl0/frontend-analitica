@@ -1,31 +1,27 @@
 interface CitasFiltersProps {
   searchQuery: string;
-  filterFechaDesde: string;
-  filterFechaHasta: string;
+  filterFecha: string;
   filterEstado: string;
   onSearchChange: (v: string) => void;
-  onFechaDesdeChange: (v: string) => void;
-  onFechaHastaChange: (v: string) => void;
+  onFechaChange: (v: string) => void;
   onEstadoChange: (v: string) => void;
   onClear: () => void;
 }
 
 export default function CitasFilters({
   searchQuery,
-  filterFechaDesde,
-  filterFechaHasta,
+  filterFecha,
   filterEstado,
   onSearchChange,
-  onFechaDesdeChange,
-  onFechaHastaChange,
+  onFechaChange,
   onEstadoChange,
   onClear,
 }: CitasFiltersProps) {
-  const hasFilters = Boolean(searchQuery || filterFechaDesde || filterFechaHasta || filterEstado);
+  const hasFilters = Boolean(searchQuery || filterFecha || filterEstado);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="md:col-span-2">
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Buscar paciente</label>
           <input
@@ -37,20 +33,11 @@ export default function CitasFilters({
           />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Desde</label>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Fecha de cita</label>
           <input
             type="date"
-            value={filterFechaDesde}
-            onChange={(e) => onFechaDesdeChange(e.target.value)}
-            className="w-full text-sm px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
-          />
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Hasta</label>
-          <input
-            type="date"
-            value={filterFechaHasta}
-            onChange={(e) => onFechaHastaChange(e.target.value)}
+            value={filterFecha}
+            onChange={(e) => onFechaChange(e.target.value)}
             className="w-full text-sm px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
           />
         </div>
