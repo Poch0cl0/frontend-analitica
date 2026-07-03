@@ -22,6 +22,13 @@ import type {
   PacienteCreate,
   TriajeResumen,
 } from '../../services/api';
+import PatientModal from '../pacientes/components/PatientModal';
+import type { PatientForm } from '../pacientes/components/PatientModal';
+import {
+  sanitizeDigits,
+  validateDni,
+  validatePhonePeru,
+} from '../../utils/patientValidation';
 import {
   DcAtenderFormView,
   atenderFormToPayload,
@@ -116,14 +123,13 @@ export default function DashboardOverview() {
 
   // Estados de los Formularios
   // 1. Registro Rápido de Paciente
-  const [quickPatient, setQuickPatient] = useState<PacienteCreate>({
-    dni: '',
+  const [quickPatient, setQuickPatient] = useState<PatientForm>({
     nombre: '',
     apellidos: '',
+    dni: '',
     fecha_nacimiento: '',
     telefono_principal: '',
     email: '',
-    medico_asignado_id: undefined
   });
   const [isRegisteringPatient, setIsRegisteringPatient] = useState<boolean>(false);
 
@@ -279,37 +285,52 @@ export default function DashboardOverview() {
 
   const handleQuickPatientChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setQuickPatient(prev => ({
-      ...prev,
-      [name]: value === '' ? undefined : value
-    }));
+    if (name === 'telefono_principal') {
+      setQuickPatient(prev => ({ ...prev, telefono_principal: sanitizeDigits(value, 9) }));
+      return;
+    }
+    if (name === 'dni') {
+      setQuickPatient(prev => ({ ...prev, dni: sanitizeDigits(value, 8) }));
+      return;
+    }
+    setQuickPatient(prev => ({ ...prev, [name]: value }));
   };
 
   const handleRegisterPatient = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!quickPatient.dni || !quickPatient.nombre || !quickPatient.apellidos || !quickPatient.fecha_nacimiento) {
-      showToastMsg('Por favor completa todos los campos requeridos (*)', 'error');
+    const dniErr = validateDni(quickPatient.dni);
+    const phoneErr = validatePhonePeru(quickPatient.telefono_principal);
+    if (dniErr || phoneErr) {
+      showToastMsg(dniErr || phoneErr || 'Datos inválidos', 'error');
       return;
     }
 
     setIsRegisteringPatient(true);
     try {
-      const response = await createPaciente(quickPatient);
+      const payload: PacienteCreate = {
+        nombre: quickPatient.nombre,
+        apellidos: quickPatient.apellidos,
+        dni: quickPatient.dni,
+        fecha_nacimiento: quickPatient.fecha_nacimiento,
+        telefono_principal: quickPatient.telefono_principal || null,
+        email: quickPatient.email || null,
+      };
+      const response = await createPaciente(payload);
       showToastMsg(`Paciente ${response.nombre} ${response.apellidos} registrada exitosamente`, 'success');
       
       // Limpiar formulario
       setQuickPatient({
-        dni: '',
         nombre: '',
         apellidos: '',
+        dni: '',
         fecha_nacimiento: '',
         telefono_principal: '',
         email: '',
-        medico_asignado_id: undefined
       });
 
       // Recargar datos en segundo plano (para actualizar KPIs y el listado de pacientes)
       await loadData(false);
+      setActiveModal(null);
     } catch (err: any) {
       console.error(err);
       const msg = err.response?.data?.detail || 'Error al registrar la paciente. Revisa los datos o el DNI.';
@@ -978,53 +999,14 @@ export default function DashboardOverview() {
 
       {/* ==================== MODAL: REGISTRAR PACIENTE ==================== */}
       {activeModal === 'registerPatient' && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-extrabold text-lg text-gray-900">Registrar Nueva Gestante</h3>
-              <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <form onSubmit={handleRegisterPatient} className="p-6 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">DNI *</label>
-                <input type="text" name="dni" required value={quickPatient.dni} onChange={handleQuickPatientChange} placeholder="Número de identidad" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Nombres *</label>
-                <input type="text" name="nombre" required value={quickPatient.nombre} onChange={handleQuickPatientChange} placeholder="Nombre de la paciente" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Apellidos *</label>
-                <input type="text" name="apellidos" required value={quickPatient.apellidos} onChange={handleQuickPatientChange} placeholder="Apellidos completos" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Fecha de Nacimiento *</label>
-                <input type="date" name="fecha_nacimiento" required value={quickPatient.fecha_nacimiento} onChange={handleQuickPatientChange} className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono Principal</label>
-                <input type="text" name="telefono_principal" value={quickPatient.telefono_principal || ''} onChange={handleQuickPatientChange} placeholder="Celular" className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Obstetra Asignado</label>
-                <select name="medico_asignado_id" value={quickPatient.medico_asignado_id || ''} onChange={handleQuickPatientChange} className="w-full text-xs px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-fuchsia-900 focus:border-fuchsia-900 bg-gray-50/50 text-gray-700">
-                  <option value="">Seleccionar Médico</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-                  ))}
-                </select>
-              </div>
-              <button type="submit" disabled={isRegisteringPatient} className="w-full mt-2 py-2.5 px-4 text-xs font-bold text-white rounded-lg shadow-sm hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all duration-150" style={{ backgroundColor: '#612853' }}>
-                {isRegisteringPatient ? 'Registrando...' : 'Registrar Gestante'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <PatientModal
+          mode="create"
+          form={quickPatient}
+          isSaving={isRegisteringPatient}
+          onClose={() => setActiveModal(null)}
+          onSubmit={handleRegisterPatient}
+          onChange={handleQuickPatientChange}
+        />
       )}
       {activeModal === 'create' && (
         <CreateCitaModal
