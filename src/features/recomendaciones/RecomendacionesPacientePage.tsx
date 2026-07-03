@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { 
-  getRecomendacionesPaciente, 
-  getPacienteById, 
-  getUltimaPrediccion, 
-  ejecutarRecomendacionesS4 
+import { Sparkles, RefreshCw } from 'lucide-react';
+import {
+  getRecomendacionesPaciente,
+  getPacienteById,
+  getUltimaPrediccion,
+  ejecutarRecomendacionesS4,
 } from '../../services/api';
 import type { RecomendacionResponse, PacienteResponse } from '../../services/api';
+import { getApiErrorMessage } from '../../services/client';
 
 const PRIMARY = '#612853';
-
-// Tipado exacto extraído de tu JSON del backend
-type AlgoritmoS4 = 'if_then' | 'cart' | 'random_forest';
 
 export default function RecomendacionesPacientePage() {
   const { pacienteId } = useParams<{ pacienteId: string }>();
@@ -19,14 +18,13 @@ export default function RecomendacionesPacientePage() {
   const [paciente, setPaciente] = useState<PacienteResponse | null>(null);
   const [recomendaciones, setRecomendaciones] = useState<RecomendacionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // ESTADOS: Control del selector y loader de generación
-  const [modeloSeleccionado, setModeloSeleccionado] = useState<AlgoritmoS4>('random_forest');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const load = async () => {
     if (!pacienteId) return;
     setIsLoading(true);
+    setErrorMsg(null);
     try {
       const [pac, recs] = await Promise.all([
         getPacienteById(Number(pacienteId)),
@@ -36,6 +34,7 @@ export default function RecomendacionesPacientePage() {
       setRecomendaciones(recs);
     } catch (err) {
       console.error(err);
+      setErrorMsg(getApiErrorMessage(err, 'No se pudieron cargar las recomendaciones.'));
     } finally {
       setIsLoading(false);
     }
@@ -45,55 +44,38 @@ export default function RecomendacionesPacientePage() {
     load();
   }, [pacienteId]);
 
-  // Ejecución del flujo secuencial del backend
   const handleGenerarClick = async () => {
     if (!pacienteId) return;
-    
+
     setIsGenerating(true);
+    setErrorMsg(null);
     try {
-      // 1. Obtener la última predicción para conseguir el prediccion_id requerido por el path
       const ultimaPred = await getUltimaPrediccion(Number(pacienteId));
-      
-      if (!ultimaPred || !ultimaPred.prediccion_id) {
-        alert("No se encontró una predicción activa. Por favor, analice el riesgo del paciente primero.");
+
+      if (!ultimaPred?.prediccion_id) {
+        setErrorMsg('No hay una predicción activa. Analice el riesgo del paciente primero.');
         return;
       }
 
-      // 2. Ejecutar el módulo S-4 automático
       await ejecutarRecomendacionesS4(Number(pacienteId), ultimaPred.prediccion_id);
-      
-      // 3. Recargar el listado completo actualizado
       const recsActualizadas = await getRecomendacionesPaciente(Number(pacienteId));
       setRecomendaciones(recsActualizadas);
-      
-      alert("¡Módulo S-4 ejecutado! Recomendaciones recalculadas para todos los modelos.");
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      if (err.response && err.response.status === 404) {
-        alert("Error 404: No se encontró la predicción o el paciente en el sistema.");
-      } else {
-        alert("Error al conectar con el servidor de analítica.");
-      }
+      setErrorMsg(getApiErrorMessage(err, 'Error al generar la recomendación.'));
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // FILTRADO EN TIEMPO REAL: Filtramos el array según el algoritmo seleccionado en el dropdown
-  // Nota: Si tu propiedad en RecomendacionResponse se llama 'algoritmo', se mapeará directamente.
-  const recomendacionesFiltradas = recomendaciones.filter(
-    (rec: any) => rec.algoritmo === modeloSeleccionado
-  );
-
   return (
     <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full space-y-6">
-      
-      {/* HEADER Y SELECCIÓN DE MODELO */}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-100 pb-4">
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/triaje')}
+            onClick={() => navigate('/recomendaciones')}
             className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
           >
             ←
@@ -107,85 +89,88 @@ export default function RecomendacionesPacientePage() {
           </div>
         </div>
 
-        {/* SELECTOR CON VALORES REALES DE TU ENDPOINT */}
-        <div className="flex flex-wrap items-center gap-2 bg-gray-50 border border-gray-200 p-1.5 rounded-xl self-start md:self-auto">
-          <div className="flex flex-col px-2">
-            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Modelo Recomendador</span>
-            <p className="text-[9px] text-amber-600 font-medium mb-0.5">Vista histórica — S-4 productivo usa Gemini</p>
-            <select
-              value={modeloSeleccionado}
-              onChange={(e) => setModeloSeleccionado(e.target.value as AlgoritmoS4)}
-              disabled={isGenerating || isLoading}
-              className="bg-transparent text-xs font-bold text-gray-700 focus:outline-none cursor-pointer py-0.5 pr-2 disabled:opacity-50"
-            >
-              <option value="random_forest">Random Forest (S-4)</option>
-              <option value="cart">Árbol de Decisión (CART)</option>
-              <option value="if_then">Reglas Si-Entonces</option>
-            </select>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGenerarClick}
-            disabled={isGenerating || isLoading}
-            className="py-2 px-4 rounded-lg text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40 shadow-sm whitespace-nowrap"
-            style={{ backgroundColor: PRIMARY }}
-          >
-            {isGenerating ? 'Generando...' : 'Generar Recomendaciones'}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleGenerarClick}
+          disabled={isGenerating || isLoading}
+          className="py-2.5 px-4 rounded-xl text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40 shadow-sm flex items-center gap-2 self-start md:self-auto"
+          style={{ backgroundColor: PRIMARY }}
+        >
+          {isGenerating ? (
+            <><RefreshCw className="w-4 h-4 animate-spin" /> Generando...</>
+          ) : (
+            <><Sparkles className="w-4 h-4" /> Generar recomendación con IA</>
+          )}
+        </button>
       </div>
 
-      {/* RENDERIZADO DE CONTENIDO */}
+      {errorMsg && (
+        <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl text-amber-900 text-sm">
+          {errorMsg}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="py-16 text-center text-gray-400">Cargando recomendaciones...</div>
       ) : recomendaciones.length === 0 ? (
-        // Estado vacío global: Cuando el paciente no tiene absolutamente nada generado
         <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center space-y-3">
-          <p className="text-gray-600 font-medium">No hay recomendaciones registradas para esta paciente.</p>
-          <p className="text-xs text-gray-400">Presione el botón superior izquierdo para ejecutar el módulo S-4 por primera vez.</p>
-          <Link to={`/pacientes/${pacienteId}`} className="inline-block py-2.5 px-5 rounded-xl text-sm font-bold text-white" style={{ backgroundColor: PRIMARY }}>
+          <div className="w-14 h-14 mx-auto rounded-full bg-fuchsia-50 flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-fuchsia-700" />
+          </div>
+          <p className="text-gray-600 font-medium">No se encontraron recomendaciones.</p>
+          <p className="text-xs text-gray-400">
+            Genere una con el botón superior o atienda una cita para ejecutar el análisis completo (predicción + triaje + recomendación).
+          </p>
+          <Link
+            to={`/pacientes/${pacienteId}`}
+            className="inline-block py-2.5 px-5 rounded-xl text-sm font-bold text-white"
+            style={{ backgroundColor: PRIMARY }}
+          >
             Ver ficha del paciente
           </Link>
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Estado vacío por filtro: Si hay recomendaciones pero ninguna del modelo seleccionado */}
-          {recomendacionesFiltradas.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
-              No se encontraron recomendaciones guardadas bajo el modelo <span className="font-bold text-gray-600">{modeloSeleccionado}</span>.
-            </div>
-          ) : (
-            // Renderizado de las tarjetas filtradas
-            recomendacionesFiltradas.map((rec: any) => (
-              <div key={rec.id || rec.recomendacion_id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
+          {recomendaciones.map((rec) => (
+            <div key={rec.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-fuchsia-600 shrink-0" />
                   <div>
                     <h2 className="text-base font-extrabold text-gray-900">
-                      {rec.titulo || rec.intervencion?.nombre || rec.recomendacion}
+                      {rec.titulo || rec.intervencion?.nombre}
                     </h2>
                     <p className="text-xs text-gray-500">
                       {rec.intervencion?.categoria || rec.intervencion?.codigo || 'Automatizada'}
                     </p>
                   </div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-fuchsia-50 text-fuchsia-900 border border-fuchsia-100 uppercase">
-                    {rec.estado || 'Activo'}
-                  </span>
                 </div>
-                {rec.descripcion && (
-                  <p className="text-sm text-gray-700 leading-relaxed">{rec.descripcion}</p>
-                )}
-                {rec.notas && (
-                  <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">{rec.notas}</p>
-                )}
-                <p className="text-[10px] text-gray-400">
-                  {rec.fecha_recomendacion 
-                    ? new Date(rec.fecha_recomendacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : 'Fecha no registrada'}
-                </p>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-fuchsia-50 text-fuchsia-900 border border-fuchsia-100 uppercase">
+                  {rec.estado || 'Activo'}
+                </span>
               </div>
-            ))
-          )}
+              {(rec.algoritmo === 'gemini' || rec.origen === 'gemini') && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border border-blue-100">
+                  <Sparkles className="w-3 h-3" /> Generado por IA (Gemini)
+                </div>
+              )}
+              {rec.descripcion && (
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{rec.descripcion}</p>
+              )}
+              {rec.notas && (
+                <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">{rec.notas}</p>
+              )}
+              <p className="text-[10px] text-gray-400">
+                {rec.fecha_recomendacion
+                  ? new Date(rec.fecha_recomendacion).toLocaleDateString('es-ES', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : 'Fecha no registrada'}
+              </p>
+            </div>
+          ))}
         </div>
       )}
     </div>

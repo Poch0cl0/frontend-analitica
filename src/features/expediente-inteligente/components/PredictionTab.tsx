@@ -105,7 +105,7 @@ function RiskTrendChart({ historial }: { historial: PrediccionHistorialItem[] })
 }
 
 export default function PredictionTab({ pacienteId }: PredictionTabProps) {
-  const { profile, prediction, historial, loading, calculating, error, ejecutar } = usePrediccion(pacienteId);
+  const { profile, prediction, historial, loading, calculating, error, sinDatosClinicos, ejecutar } = usePrediccion(pacienteId);
   const [isAccordionOpen, setIsAccordionOpen] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailMsg, setEmailMsg] = useState<string | null>(null);
@@ -164,6 +164,21 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
 
   return (
     <div className="space-y-5">
+      {sinDatosClinicos && (
+        <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl text-amber-900 text-sm flex items-start gap-2">
+          <Info className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Sin datos clínicos registrados</p>
+            <p className="mt-1">
+              Esta paciente aún no tiene datos clínicos. Regístrelos en{' '}
+              <a href={`/pacientes/${pacienteId}`} className="underline font-semibold text-amber-950">
+                la ficha del paciente
+              </a>{' '}
+              antes de calcular predicción, triaje o recomendaciones.
+            </p>
+          </div>
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl text-red-700 font-medium text-sm flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />
@@ -194,7 +209,7 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
             <h3 className="text-base font-bold text-slate-800">No se encontraron predicciones de IA</h3>
             <p className="text-xs text-slate-500 mt-1">Ejecute el set de modelos matemáticos usando las variables clínicas actuales.</p>
           </div>
-          <button onClick={ejecutar} disabled={calculating}
+          <button onClick={ejecutar} disabled={calculating || sinDatosClinicos}
             className="px-6 py-3 bg-[#612853] hover:bg-[#522146] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-md disabled:opacity-50">
             {calculating ? <><RefreshCw className="w-4 h-4 animate-spin" /> Procesando...</> : <><Activity className="w-4 h-4" /> Calcular Predicción por Consenso</>}
           </button>

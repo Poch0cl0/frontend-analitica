@@ -34,4 +34,25 @@ api.interceptors.response.use(
   },
 );
 
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const ax = err as {
+    response?: { data?: { detail?: unknown }; status?: number };
+    code?: string;
+    message?: string;
+  };
+  if (!ax.response) {
+    if (ax.code === 'ERR_NETWORK' || ax.message?.includes('Network Error')) {
+      return 'No hay conexión con el servidor. Verifica que el backend esté activo (uvicorn en el puerto 8000).';
+    }
+    return 'No hay conexión con el servidor. Verifica que el backend esté activo.';
+  }
+  const detail = ax.response.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (first?.msg) return first.msg;
+  }
+  return fallback;
+}
+
 export { API_BASE_URL };

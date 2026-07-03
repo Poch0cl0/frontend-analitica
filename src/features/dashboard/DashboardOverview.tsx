@@ -39,6 +39,7 @@ import DeleteCitaModal from '../citas/components/DeleteCitaModal';
 import { useCitaActions } from '../../hooks/useCitaActions';
 import AdminAnalyticsPanel from './AdminAnalyticsPanel';
 import OperativoDashboardPanel from './OperativoDashboardPanel';
+import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
 
 // ==================== TIPOS ADICIONALES ====================
 

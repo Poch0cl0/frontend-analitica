@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   api,
+  createCita,
   getCitas,
   getCitaById,
   changeCitaEstado,
@@ -13,6 +14,7 @@ import {
   type CitaResponseEnriquecida,
   type MedicoResumen,
 } from '../../services/api';
+import { getApiErrorMessage } from '../../services/client';
 import { atenderFormToPayload, emptyAtenderForm, validateAtenderForm, type DcAtenderForm } from '../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import Toast from '../../components/ui/Toast';
@@ -249,14 +251,24 @@ export default function CitasPage() {
         fecha_hora_fin: `${payload.fecha}T${payload.horaFin}:00`,
         notas: payload.notas || null,
       });
-      showToast('Cita programada con éxito', 'success');
       setSelectedSlot(null);
       setActiveModal(null);
-      await loadCitas();
+      setFilterFechaDesde(payload.fecha);
+      setFilterFechaHasta(payload.fecha);
       setActiveTab('lista');
+      showToast('Cita programada con éxito', 'success');
+      try {
+        const [data, meds] = await Promise.all([
+          getCitas(undefined, undefined, filterEstado || undefined, payload.fecha, payload.fecha),
+          getMedicos(),
+        ]);
+        setCitas(sortCitasPorProximidad(data));
+        setMedicos(meds);
+      } catch {
+        showToast('Cita creada. Si no aparece en la lista, actualice la página.', 'success');
+      }
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      showToast(detail || 'No se pudo programar la cita', 'error');
+      showToast(getApiErrorMessage(err, 'No se pudo programar la cita'), 'error');
     } finally {
       setIsSavingSlot(false);
     }

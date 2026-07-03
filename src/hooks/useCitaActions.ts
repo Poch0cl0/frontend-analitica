@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { createCita, deleteCita, updateCita, type CitaCreate, type CitaResponseEnriquecida, type CitaUpdate } from '../services/api';
+import { getApiErrorMessage } from '../services/client';
 import type { EditCitaForm } from '../features/citas/components/EditCitaModal';
 import type { NewCitaForm } from '../features/citas/components/CreateCitaModal';
 import { formatLocalDate } from '../utils/date';
@@ -58,8 +59,7 @@ export function useCitaActions({
       onCloseModal();
       await onRefresh();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      onError(detail || 'No se pudo programar la cita');
+      onError(getApiErrorMessage(err, 'No se pudo programar la cita'));
     } finally {
       setSaving(false);
     }
@@ -84,8 +84,7 @@ export function useCitaActions({
       onCloseModal();
       await onRefresh();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      onError(detail || 'No se pudo actualizar la cita');
+      onError(getApiErrorMessage(err, 'No se pudo actualizar la cita'));
     } finally {
       setSaving(false);
     }
@@ -98,8 +97,7 @@ export function useCitaActions({
       onCloseModal();
       await onRefresh();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      onError(detail || 'No se pudo cancelar la cita');
+      onError(getApiErrorMessage(err, 'No se pudo cancelar la cita'));
     }
   };
 

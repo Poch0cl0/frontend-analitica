@@ -4,7 +4,7 @@ import { Search, X, Loader2 } from 'lucide-react';
 import PredictionTab from './components/PredictionTab';
 import TriageTab from './components/TriageTab';
 import RecommendationTab from './components/RecommendationTab';
-import { getPacientes } from '../../services/api';
+import { getPacientesFiltered } from '../../services/api';
 import type { PacienteResponse } from '../../services/api';
 import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
@@ -33,7 +33,7 @@ export default function ExpedienteInteligenteModal({
   useEffect(() => {
     setLoadingPatients(true);
     setPatientError(null);
-    getPacientes('', 1, 100)
+    getPacientesFiltered({ estado: 'activo', limit: 100 })
       .then(res => {
         setPatients(res.items || []);
         if (!res.items || res.items.length === 0) {
