@@ -77,6 +77,14 @@ export default function CitasPage() {
 
   const closeModal = () => setActiveModal(null);
 
+  const handleIrACitasFecha = useCallback((fecha: string) => {
+    setActiveTab('lista');
+    setFilterFechaDesde(fecha);
+    setFilterFechaHasta(fecha);
+    setFilterEstado('');
+    setSearchQuery('');
+  }, []);
+
   const loadCitas = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
@@ -334,7 +342,9 @@ export default function CitasPage() {
         </div>
       )}
 
-      {!isDoctor && activeTab === 'config' && <AgendaConfigPanel />}
+      {!isDoctor && activeTab === 'config' && (
+        <AgendaConfigPanel onIrACitas={handleIrACitasFecha} />
+      )}
 
       {(isDoctor || activeTab === 'lista') && (
         <>

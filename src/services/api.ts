@@ -342,6 +342,30 @@ export interface DiaNoLaborableCreate {
   medico_id?: number | null;
 }
 
+export interface CitaPendienteFeriado {
+  id: number;
+  hora: string;
+  paciente_nombre?: string | null;
+  medico_nombre?: string | null;
+  medico_id: number;
+  estado: string;
+}
+
+export interface FeriadoValidacionResponse {
+  fecha: string;
+  puede_feriado: boolean;
+  total_citas: number;
+  citas: CitaPendienteFeriado[];
+}
+
+export interface FeriadoConflictDetail {
+  code: 'feriado_con_citas';
+  message: string;
+  fecha: string;
+  total: number;
+  citas: CitaPendienteFeriado[];
+}
+
 export interface SlotCalendario {
   hora_inicio: string;
   hora_fin: string;
@@ -505,6 +529,20 @@ export const getDiasNoLaborables = async (desde?: string, hasta?: string): Promi
   if (desde) params.desde = desde;
   if (hasta) params.hasta = hasta;
   const response = await api.get<DiaNoLaborable[]>('/api/agenda/dias-no-laborables', { params });
+  return response.data;
+};
+
+export const validarFeriadoFecha = async (
+  fecha: string,
+  alcance: 'clinica' | 'medico' = 'clinica',
+  medicoId?: number,
+): Promise<FeriadoValidacionResponse> => {
+  const params: Record<string, string | number> = { fecha, alcance };
+  if (medicoId) params.medico_id = medicoId;
+  const response = await api.get<FeriadoValidacionResponse>(
+    '/api/agenda/dias-no-laborables/validar',
+    { params },
+  );
   return response.data;
 };
 
