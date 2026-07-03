@@ -14,7 +14,7 @@ import {
 import { defaultAnalyticsRange, formatAnalyticsPeriodo } from '../../utils/analyticsTimeSeries';
 import { useUserRole } from '../../hooks/useUserRole';
 import SearchableEntitySelect from '../../components/ui/SearchableEntitySelect';
-import { formatCitaFechaHora } from '../../utils/citaTime';
+import { formatCitaFechaHora, sortCitasPorProximidad } from '../../utils/citaTime';
 import { getStatusBadgeStyles, getStatusLabel } from '../citas/citaUiUtils';
 
 const CITA_COLORS: Record<string, string> = {
@@ -95,7 +95,7 @@ export default function OperativoDashboardPanel() {
         range.desde,
         range.hasta,
       );
-      setCitas(res);
+      setCitas(sortCitasPorProximidad(res));
     } catch {
       setCitas([]);
     } finally {

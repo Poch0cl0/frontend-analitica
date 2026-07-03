@@ -32,7 +32,7 @@ import {
 import { useUserRole } from '../../hooks/useUserRole';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import type { DatosClinicosResponse } from '../../services/api';
-import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
+import { sortCitasPorProximidad } from '../../utils/citaTime';
 import CreateCitaModal from '../citas/components/CreateCitaModal';
 import EditCitaModal, { type EditCitaForm } from '../citas/components/EditCitaModal';
 import DeleteCitaModal from '../citas/components/DeleteCitaModal';
@@ -186,15 +186,11 @@ export default function DashboardOverview() {
       setResumen(resumenResult.value as DashboardResumen);
 
       if (results[1].status === 'fulfilled') {
-        const citasHoyData = results[1].value as CitaResponseEnriquecida[];
-        const sortedCitas = [...citasHoyData].sort((a, b) =>
-          new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
-        );
-        setCitasHoy(sortedCitas);
+        setCitasHoy(sortCitasPorProximidad(results[1].value as CitaResponseEnriquecida[]));
       }
 
       if (results[2].status === 'fulfilled') {
-        setAllCitas(results[2].value as CitaResponseEnriquecida[]);
+        setAllCitas(sortCitasPorProximidad(results[2].value as CitaResponseEnriquecida[]));
       }
 
       if (results[3].status === 'fulfilled') {

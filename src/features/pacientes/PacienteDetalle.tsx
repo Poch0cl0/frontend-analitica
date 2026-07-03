@@ -38,6 +38,7 @@ import {
 } from '../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import { formatLocalDate } from '../../utils/date';
+import { sortCitasPorProximidad } from '../../utils/citaTime';
 import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
 import PacienteCitaModal, { type CitaFormData } from './components/PacienteCitaModal';
 import DeleteCitaModal from '../citas/components/DeleteCitaModal';
@@ -159,7 +160,7 @@ export default function PacienteDetalle() {
         ]);
 
         const allCitas = await getCitas();
-        setCitas(allCitas.filter(c => c.paciente_id === pac.id));
+        setCitas(sortCitasPorProximidad(allCitas.filter(c => c.paciente_id === pac.id)));
 
         // Cargar datos clínicos para médico/admin
         if (!isSecretary) {
@@ -193,7 +194,7 @@ export default function PacienteDetalle() {
   const reloadCitas = async () => {
     if (!paciente) return;
     const all = await getCitas();
-    setCitas(all.filter(c => c.paciente_id === paciente.id));
+    setCitas(sortCitasPorProximidad(all.filter(c => c.paciente_id === paciente.id)));
   };
 
   // ── DATOS CLÍNICOS (médico) ────────────────────────────────────────────────

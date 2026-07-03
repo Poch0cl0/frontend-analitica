@@ -34,7 +34,7 @@ import CitaSlotAccionesModal from './components/CitaSlotAccionesModal';
 import ReprogramarCitaModal from './components/ReprogramarCitaModal';
 import AgendaConfigPanel from './components/AgendaConfigPanel';
 import type { PacientePerfilResponse } from './types';
-import { createCita } from '../../services/api';
+import { sortCitasPorProximidad } from '../../utils/citaTime';
 
 type ActiveModal = 'detail' | 'atender' | 'edit' | 'delete' | 'create' | 'slot' | 'slotCita' | 'reprogramar' | null;
 type CitasTab = 'lista' | 'agenda' | 'config';
@@ -93,7 +93,7 @@ export default function CitasPage() {
       ];
       const results = await Promise.all(requests);
       const data = results[0] as CitaResponseEnriquecida[];
-      setCitas(data.sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime()));
+      setCitas(sortCitasPorProximidad(data));
       setMedicos(results[1] as MedicoResumen[]);
     } catch {
       setErrorMsg('Error al cargar las citas.');
