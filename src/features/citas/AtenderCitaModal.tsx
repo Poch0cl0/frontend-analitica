@@ -2,6 +2,7 @@ import type { FormEvent } from 'react';
 import type { CitaResponseEnriquecida } from '../../services/api';
 import { DcAtenderFormView, type DcAtenderForm } from '../../components/DatosClinicosAtenderForm';
 import { formatHour } from './citaUiUtils';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface AtenderCitaModalProps {
   cita: CitaResponseEnriquecida;
@@ -22,9 +23,11 @@ export default function AtenderCitaModal({
   onChange,
   onSubmit,
 }: AtenderCitaModalProps) {
+  const backdrop = useModalBackdrop(onClose);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
-         onClick={onClose}>
+         {...backdrop}>
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
            onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">

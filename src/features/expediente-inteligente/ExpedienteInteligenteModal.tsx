@@ -6,6 +6,7 @@ import TriageTab from './components/TriageTab';
 import RecommendationTab from './components/RecommendationTab';
 import { getPacientes } from '../../services/api';
 import type { PacienteResponse } from '../../services/api';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 const TABS: { key: ExpedienteTab; label: string; icon: string }[] = [
   { key: 'prediccion', label: 'Predicción de Riesgo', icon: '📊' },
@@ -80,10 +81,12 @@ export default function ExpedienteInteligenteModal({
     setShowDropdown(false);
   };
 
+  const backdrop = useModalBackdrop(onClose);
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="bg-white rounded-2xl max-w-5xl w-full shadow-2xl border border-gray-100 flex flex-col animate-zoom-in"

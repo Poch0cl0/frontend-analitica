@@ -1,9 +1,16 @@
+export function isCitaCerrada(estado: string) {
+  return ['cumplida', 'cancelada', 'reprogramada', 'no_asistio_paciente', 'no_asistio_medico'].includes(estado);
+}
+
 export function getStatusBadgeStyles(status: string) {
   switch (status) {
     case 'programada': return 'bg-sky-50 text-sky-700 border-sky-200';
     case 'en_atencion': return 'bg-purple-50 text-purple-700 border-purple-200 animate-pulse';
     case 'cumplida': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     case 'cancelada': return 'bg-red-50 text-red-700 border-red-200';
+    case 'reprogramada': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'no_asistio_paciente': return 'bg-amber-50 text-amber-800 border-amber-200';
+    case 'no_asistio_medico': return 'bg-rose-50 text-rose-800 border-rose-200';
     default: return 'bg-gray-50 text-gray-500 border-gray-200';
   }
 }
@@ -14,7 +21,10 @@ export function getStatusLabel(status: string) {
     case 'en_atencion': return 'En Atención';
     case 'cumplida': return 'Cumplida';
     case 'cancelada': return 'Cancelada';
-    default: return status;
+    case 'reprogramada': return 'Reprogramada';
+    case 'no_asistio_paciente': return 'No asistió paciente';
+    case 'no_asistio_medico': return 'No asistió médico';
+    default: return status.replace(/_/g, ' ');
   }
 }
 

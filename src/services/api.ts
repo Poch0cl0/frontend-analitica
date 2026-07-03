@@ -1,34 +1,6 @@
-import axios from 'axios';
+import { api } from './client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Interceptor para inyectar el token JWT en cada petición automáticamente
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Interceptor para manejar el error 401 (Token expirado o inválido)
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+export { api, API_BASE_URL } from './client';
 
 // ==================== INTERFACES Y MODELOS ====================
 
@@ -41,6 +13,61 @@ export interface DashboardResumen {
   pacientes_sin_cita: number;
 }
 
+export type AnalyticsGranularidad = 'day' | 'week' | 'month' | 'year';
+
+export interface DashboardAnalyticsTotales {
+  total_usuarios: number;
+  total_pacientes: number;
+  citas_atendidas: number;
+  citas_canceladas: number;
+  citas_reprogramadas: number;
+  citas_programadas: number;
+  ausencias_paciente: number;
+  ausencias_medico: number;
+  predicciones_total: number;
+}
+
+export interface SerieCitasPeriodo {
+  periodo: string;
+  programada: number;
+  en_atencion: number;
+  cumplida: number;
+  cancelada: number;
+  reprogramada: number;
+  no_asistio_paciente: number;
+  no_asistio_medico: number;
+}
+
+export interface SerieRiesgoPeriodo {
+  periodo: string;
+  bajo: number;
+  medio: number;
+  alto: number;
+  critico: number;
+}
+
+export interface SerieConteoPeriodo {
+  periodo: string;
+  total: number;
+}
+
+export interface UsuariosPorRol {
+  rol: string;
+  total: number;
+}
+
+export interface DashboardAnalytics {
+  granularidad: AnalyticsGranularidad;
+  fecha_desde: string;
+  fecha_hasta: string;
+  totales: DashboardAnalyticsTotales;
+  usuarios_por_rol: UsuariosPorRol[];
+  serie_citas: SerieCitasPeriodo[];
+  serie_riesgo: SerieRiesgoPeriodo[];
+  serie_pacientes_nuevos: SerieConteoPeriodo[];
+  riesgo_distribucion: Record<string, number>;
+}
+
 export interface MedicoResumen {
   id: number;
   nombre: string;
@@ -51,12 +78,14 @@ export interface CitaCreate {
   paciente_id: number;
   medico_id: number;
   fecha_hora: string; // ISO 8601 string
+  fecha_hora_fin?: string | null;
   duracion_minutos?: number;
   notas?: string | null;
 }
 
 export interface CitaUpdate {
   fecha_hora?: string | null;
+  fecha_hora_fin?: string | null;
   medico_id?: number | null;
   estado?: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada' | null;
   notas?: string | null;
@@ -68,9 +97,13 @@ export interface CitaResponse {
   paciente_id: number;
   medico_id: number;
   fecha_hora: string;
+  fecha_hora_fin?: string | null;
   duracion_minutos: number;
-  estado: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada';
+  estado: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada' | 'reprogramada' | 'no_asistio_paciente' | 'no_asistio_medico';
   notas: string | null;
+  cita_anterior_id?: number | null;
+  motivo_cierre?: string | null;
+  notas_cierre?: string | null;
   created_at: string;
 }
 
@@ -122,12 +155,77 @@ export const getDashboardResumen = async (): Promise<DashboardResumen> => {
   return response.data;
 };
 
-export const getCitas = async (fecha?: string, medicoId?: number, estado?: string): Promise<CitaResponseEnriquecida[]> => {
+export const getDashboardAnalytics = async (
+  fechaDesde: string,
+  fechaHasta: string,
+  granularidad: AnalyticsGranularidad = 'month',
+  medicoId?: number,
+): Promise<DashboardAnalytics> => {
+  const params: Record<string, string | number> = {
+    fecha_desde: fechaDesde,
+    fecha_hasta: fechaHasta,
+    granularidad,
+  };
+  if (medicoId) params.medico_id = medicoId;
+  const response = await api.get<DashboardAnalytics>('/api/dashboard/analytics', { params });
+  return response.data;
+};
+
+export interface DashboardOperativoKpis {
+  total_pacientes: number;
+  total_citas: number;
+  realizadas: number;
+  programadas: number;
+  en_atencion: number;
+  canceladas: number;
+  reprogramadas: number;
+  no_asistio_paciente: number;
+  no_asistio_medico: number;
+  pendientes: number;
+  slots_libres: number;
+  slots_ocupados: number;
+  nivel_ocupacion: number;
+}
+
+export interface DashboardOperativo {
+  granularidad: string;
+  fecha_desde: string;
+  fecha_hasta: string;
+  medico_id: number | null;
+  kpis: DashboardOperativoKpis;
+  serie_citas: SerieCitasPeriodo[];
+}
+
+export const getDashboardOperativo = async (
+  fechaDesde: string,
+  fechaHasta: string,
+  granularidad: AnalyticsGranularidad = 'month',
+  medicoId?: number,
+): Promise<DashboardOperativo> => {
+  const params: Record<string, string | number> = {
+    fecha_desde: fechaDesde,
+    fecha_hasta: fechaHasta,
+    granularidad,
+  };
+  if (medicoId) params.medico_id = medicoId;
+  const response = await api.get<DashboardOperativo>('/api/dashboard/operativo', { params });
+  return response.data;
+};
+
+export const getCitas = async (
+  fecha?: string,
+  medicoId?: number,
+  estado?: string,
+  fechaDesde?: string,
+  fechaHasta?: string,
+): Promise<CitaResponseEnriquecida[]> => {
   const params: Record<string, string | number> = {};
   if (fecha) params.fecha = fecha;
+  if (fechaDesde) params.fecha_desde = fechaDesde;
+  if (fechaHasta) params.fecha_hasta = fechaHasta;
   if (medicoId) params.medico_id = medicoId;
   if (estado) params.estado = estado;
-  
+
   const response = await api.get<CitaResponseEnriquecida[]>('/api/citas/', { params });
   return response.data;
 };
@@ -154,6 +252,322 @@ export const deleteCita = async (id: number): Promise<CitaResponse> => {
 
 export const changeCitaEstado = async (id: number, estado: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada'): Promise<CitaResponse> => {
   const response = await api.put<CitaResponse>(`/api/citas/${id}/estado`, { estado });
+  return response.data;
+};
+
+export interface DisponibilidadSlot {
+  hora_inicio: string;
+  hora_fin: string;
+  disponible: boolean;
+}
+
+export interface DisponibilidadResponse {
+  medico_id: number;
+  fecha: string;
+  slots: DisponibilidadSlot[];
+  motivo_no_laborable?: string | null;
+}
+
+export interface MedicoDisponibilidadResumen {
+  medico_id: number;
+  nombre: string;
+  disponible: boolean;
+  motivo?: string | null;
+}
+
+export interface DisponibilidadResumenResponse {
+  fecha: string;
+  hora: string;
+  duracion_minutos?: number;
+  medicos: MedicoDisponibilidadResumen[];
+}
+
+export interface MedicoSlotDisponible {
+  medico_id: number;
+  nombre: string;
+}
+
+export interface SlotSemanal {
+  hora_inicio: string;
+  hora_fin: string;
+  disponible: boolean;
+  medicos_disponibles: MedicoSlotDisponible[];
+}
+
+export interface DiaSemanalDisponibilidad {
+  fecha: string;
+  dia_semana: number;
+  nombre_dia: string;
+  es_laborable: boolean;
+  motivo_no_laborable?: string | null;
+  slots: SlotSemanal[];
+}
+
+export interface DisponibilidadSemanaResponse {
+  fecha_inicio: string;
+  fecha_fin: string;
+  duracion_minutos: number;
+  dias: DiaSemanalDisponibilidad[];
+}
+
+export interface HorarioMedico {
+  id: number;
+  medico_id: number;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+  activo: boolean;
+}
+
+export interface HorarioMedicoCreate {
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+  activo?: boolean;
+}
+
+export interface DiaNoLaborable {
+  id: number;
+  fecha: string;
+  motivo?: string | null;
+  alcance: 'clinica' | 'medico';
+  medico_id?: number | null;
+  created_at: string;
+}
+
+export interface DiaNoLaborableCreate {
+  fecha: string;
+  motivo?: string | null;
+  alcance?: 'clinica' | 'medico';
+  medico_id?: number | null;
+}
+
+export interface SlotCalendario {
+  hora_inicio: string;
+  hora_fin: string;
+  tipo: string;
+  cita_id?: number | null;
+  paciente_nombre?: string | null;
+  medico_id?: number | null;
+  medico_nombre?: string | null;
+  estado?: string | null;
+  medicos_disponibles?: MedicoSlotDisponible[];
+  fuera_horario?: boolean;
+}
+
+export interface CitaPendienteHorario {
+  cita_id: number;
+  fecha_hora: string;
+  fecha_hora_fin?: string | null;
+  estado: string;
+  paciente_nombre?: string | null;
+  fuera_horario: boolean;
+  motivo: string;
+}
+
+export interface HorarioValidacionResponse {
+  total_pendientes: number;
+  fuera_horario: number;
+  citas: CitaPendienteHorario[];
+}
+
+export interface DiaCalendario {
+  fecha: string;
+  dia_semana: number;
+  nombre_dia: string;
+  es_laborable: boolean;
+  motivo_no_laborable?: string | null;
+  total_libres: number;
+  total_ocupados: number;
+  slots: SlotCalendario[];
+}
+
+export interface AgendaCalendarioResponse {
+  fecha_inicio: string;
+  fecha_fin: string;
+  duracion_minutos: number;
+  vista: string;
+  dias: DiaCalendario[];
+}
+
+export interface CitaEstadisticasResponse {
+  total: number;
+  realizadas: number;
+  programadas: number;
+  en_atencion: number;
+  canceladas: number;
+  reprogramadas: number;
+  no_asistio_paciente: number;
+  no_asistio_medico: number;
+  slots_libres: number;
+  slots_ocupados: number;
+}
+
+export interface CitaReprogramar {
+  fecha_hora: string;
+  fecha_hora_fin?: string;
+  medico_id?: number;
+  duracion_minutos?: number;
+  notas?: string | null;
+  motivo?: string | null;
+}
+
+export const getDisponibilidad = async (
+  medicoId: number,
+  fecha: string,
+  duracionMinutos = 30,
+): Promise<DisponibilidadResponse> => {
+  const response = await api.get<DisponibilidadResponse>('/api/citas/disponibilidad', {
+    params: { medico_id: medicoId, fecha, duracion_minutos: duracionMinutos },
+  });
+  return response.data;
+};
+
+export const getDisponibilidadSemana = async (
+  fecha: string,
+  duracionMinutos = 30,
+): Promise<DisponibilidadSemanaResponse> => {
+  const response = await api.get<DisponibilidadSemanaResponse>('/api/citas/disponibilidad/semana', {
+    params: { fecha, duracion_minutos: duracionMinutos },
+  });
+  return response.data;
+};
+
+export const getDisponibilidadResumen = async (
+  fecha: string,
+  hora: string,
+  duracionMinutos = 30,
+): Promise<DisponibilidadResumenResponse> => {
+  const response = await api.get<DisponibilidadResumenResponse>('/api/citas/disponibilidad/resumen', {
+    params: { fecha, hora, duracion_minutos: duracionMinutos },
+  });
+  return response.data;
+};
+
+export const validarHorarioCita = async (
+  medicoId: number,
+  fecha: string,
+  hora: string,
+  duracionMinutos = 30,
+  excluirCitaId?: number,
+): Promise<{ disponible: boolean; motivo?: string | null }> => {
+  const params: Record<string, string | number> = {
+    medico_id: medicoId,
+    fecha,
+    hora,
+    duracion_minutos: duracionMinutos,
+  };
+  if (excluirCitaId) params.excluir_cita_id = excluirCitaId;
+  const response = await api.get<{ disponible: boolean; motivo?: string | null }>(
+    '/api/citas/validar-horario',
+    { params },
+  );
+  return response.data;
+};
+
+export const getHorariosMedico = async (medicoId: number): Promise<HorarioMedico[]> => {
+  const response = await api.get<HorarioMedico[]>(`/api/agenda/horarios-medico/${medicoId}`);
+  return response.data;
+};
+
+export const setHorariosMedicoBulk = async (
+  medicoId: number,
+  bloques: HorarioMedicoCreate[],
+): Promise<HorarioMedico[]> => {
+  const response = await api.put<HorarioMedico[]>(`/api/agenda/horarios-medico/${medicoId}/bulk`, {
+    bloques,
+  });
+  return response.data;
+};
+
+export const getCitasPendientesHorarioMedico = async (
+  medicoId: number,
+): Promise<HorarioValidacionResponse> => {
+  const response = await api.get<HorarioValidacionResponse>(
+    `/api/agenda/horarios-medico/${medicoId}/citas-pendientes`,
+  );
+  return response.data;
+};
+
+export const validarBloquesHorarioMedico = async (
+  medicoId: number,
+  bloques: HorarioMedicoCreate[],
+): Promise<HorarioValidacionResponse> => {
+  const response = await api.post<HorarioValidacionResponse>(
+    `/api/agenda/horarios-medico/${medicoId}/validar-bloques`,
+    { bloques },
+  );
+  return response.data;
+};
+
+export const getDiasNoLaborables = async (desde?: string, hasta?: string): Promise<DiaNoLaborable[]> => {
+  const params: Record<string, string> = {};
+  if (desde) params.desde = desde;
+  if (hasta) params.hasta = hasta;
+  const response = await api.get<DiaNoLaborable[]>('/api/agenda/dias-no-laborables', { params });
+  return response.data;
+};
+
+export const createDiaNoLaborable = async (data: DiaNoLaborableCreate): Promise<DiaNoLaborable> => {
+  const response = await api.post<DiaNoLaborable>('/api/agenda/dias-no-laborables', data);
+  return response.data;
+};
+
+export const deleteDiaNoLaborable = async (id: number): Promise<void> => {
+  await api.delete(`/api/agenda/dias-no-laborables/${id}`);
+};
+
+export const getAgendaCalendario = async (
+  fechaDesde: string,
+  fechaHasta: string,
+  duracionMinutos = 30,
+  medicoId?: number,
+  filtroSlots = 'todos',
+  vista = 'semana',
+): Promise<AgendaCalendarioResponse> => {
+  const params: Record<string, string | number> = {
+    fecha_desde: fechaDesde,
+    fecha_hasta: fechaHasta,
+    duracion_minutos: duracionMinutos,
+    filtro_slots: filtroSlots,
+    vista,
+  };
+  if (medicoId) params.medico_id = medicoId;
+  const response = await api.get<AgendaCalendarioResponse>('/api/citas/agenda-calendario', { params });
+  return response.data;
+};
+
+export const getCitaEstadisticas = async (
+  fechaDesde: string,
+  fechaHasta: string,
+  medicoId?: number,
+  duracionMinutos = 30,
+): Promise<CitaEstadisticasResponse> => {
+  const params: Record<string, string | number> = {
+    fecha_desde: fechaDesde,
+    fecha_hasta: fechaHasta,
+    duracion_minutos: duracionMinutos,
+  };
+  if (medicoId) params.medico_id = medicoId;
+  const response = await api.get<CitaEstadisticasResponse>('/api/citas/estadisticas', { params });
+  return response.data;
+};
+
+export const reprogramarCita = async (id: number, data: CitaReprogramar): Promise<CitaResponseEnriquecida> => {
+  const response = await api.post<CitaResponseEnriquecida>(`/api/citas/${id}/reprogramar`, data);
+  return response.data;
+};
+
+export const marcarAusenciaCita = async (
+  id: number,
+  data: { tipo: 'paciente' | 'medico'; motivo?: string; notas?: string },
+): Promise<CitaResponse> => {
+  const response = await api.post<CitaResponse>(`/api/citas/${id}/ausencia`, data);
+  return response.data;
+};
+
+export const cancelarCitaConMotivo = async (id: number, motivo?: string): Promise<CitaResponse> => {
+  const response = await api.delete<CitaResponse>(`/api/citas/${id}`, { params: motivo ? { motivo } : {} });
   return response.data;
 };
 
@@ -209,9 +623,14 @@ export const updatePaciente = async (id: number, data: PacienteUpdatePayload): P
   return response.data;
 };
 
-export const deletePaciente = async (id: number): Promise<PacienteResponse> => {
-  const response = await api.delete<PacienteResponse>(`/api/pacientes/${id}`);
+export const deletePaciente = async (id: number): Promise<{ paciente: PacienteResponse; citas_canceladas: number }> => {
+  const response = await api.delete<{ paciente: PacienteResponse; citas_canceladas: number }>(`/api/pacientes/${id}`);
   return response.data;
+};
+
+export const getCitasFuturasPaciente = async (id: number): Promise<number> => {
+  const response = await api.get<{ total: number }>(`/api/pacientes/${id}/citas-futuras`);
+  return response.data.total;
 };
 
 export const createPaciente = async (data: PacienteCreate): Promise<PacienteResponse> => {
@@ -381,6 +800,7 @@ export interface RolResponse {
 
 export interface UsuarioResponse {
   id: number;
+  username: string;
   email: string;
   nombre: string;
   apellidos: string;
@@ -390,6 +810,7 @@ export interface UsuarioResponse {
 }
 
 export interface UsuarioCreatePayload {
+  username: string;
   email: string;
   password: string;
   nombre: string;
@@ -398,10 +819,10 @@ export interface UsuarioCreatePayload {
 }
 
 export interface UsuarioUpdatePayload {
+  username?: string;
   email?: string;
   nombre?: string;
   apellidos?: string;
-  rol_id?: number;
   activo?: boolean;
 }
 
@@ -425,8 +846,8 @@ export const updateUsuario = async (id: number, data: UsuarioUpdatePayload): Pro
   return response.data;
 };
 
-export const desactivarUsuario = async (id: number): Promise<UsuarioResponse> => {
-  const response = await api.delete<UsuarioResponse>(`/api/usuarios/${id}`);
+export const desactivarUsuario = async (id: number): Promise<{ usuario: UsuarioResponse; citas_canceladas: number }> => {
+  const response = await api.delete<{ usuario: UsuarioResponse; citas_canceladas: number }>(`/api/usuarios/${id}`);
   return response.data;
 };
 
@@ -459,6 +880,7 @@ export interface PrediccionFeedbackResponse {
   prediccion_id: number;
   medico_id: number;
   modelo: string | null;
+  aspecto: string;
   voto_correcta: boolean;
   comentario: string | null;
   created_at: string;
@@ -468,14 +890,16 @@ export interface PrediccionFeedbackInput {
   voto_correcta: boolean;
   comentario?: string;
   modelo?: string;
+  aspecto?: 'probabilidad' | 'semanas';
 }
 
 export const getPrediccionFeedback = async (
   prediccionId: number,
   modelo?: string,
+  aspecto: 'probabilidad' | 'semanas' = 'probabilidad',
 ): Promise<PrediccionFeedbackResponse | null> => {
   try {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { aspecto };
     if (modelo) params.modelo = modelo;
     const response = await api.get<PrediccionFeedbackResponse>(`/api/prediccion/${prediccionId}/feedback`, { params });
     return response.data;
@@ -516,17 +940,36 @@ export interface FeedbackTemporal {
   precision: number;
 }
 
+export interface FeedbackPorAspecto {
+  aspecto: string;
+  total: number;
+  correctos: number;
+  incorrectos: number;
+  precision: number;
+}
+
 export interface FeedbackEstadisticasResponse {
   total_votos: number;
   total_correctos: number;
   total_incorrectos: number;
   precision_global: number;
   por_modelo: FeedbackPorModelo[];
+  por_aspecto: FeedbackPorAspecto[];
   temporal: FeedbackTemporal[];
+  alcance: string;
+  medico_id: number | null;
 }
 
-export const getFeedbackEstadisticas = async (): Promise<FeedbackEstadisticasResponse> => {
-  const response = await api.get<FeedbackEstadisticasResponse>('/api/prediccion/feedback/estadisticas');
+export const getFeedbackEstadisticas = async (params?: {
+  alcance?: 'global' | 'propio';
+  medicoId?: number;
+  aspecto?: 'probabilidad' | 'semanas';
+}): Promise<FeedbackEstadisticasResponse> => {
+  const query: Record<string, string | number> = {};
+  if (params?.alcance) query.alcance = params.alcance;
+  if (params?.medicoId) query.medico_id = params.medicoId;
+  if (params?.aspecto) query.aspecto = params.aspecto;
+  const response = await api.get<FeedbackEstadisticasResponse>('/api/prediccion/feedback/estadisticas', { params: query });
   return response.data;
 };
 
@@ -580,6 +1023,58 @@ export const sincronizarTriaje = async (): Promise<{ procesados: number }> => {
 };
 
 // ==================== RECOMENDACIONES ====================
+
+export interface RecomendacionListItem {
+  id: number;
+  paciente_id: number;
+  paciente_nombre: string;
+  semanas_gestacion: number | null;
+  titulo: string;
+  tipo: string | null;
+  prioridad: 'alta' | 'media' | 'baja' | null;
+  estado: string;
+  fecha: string;
+  medico_nombre: string | null;
+}
+
+export interface RecomendacionListResponse {
+  items: RecomendacionListItem[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export interface RecomendacionUpdatePayload {
+  estado?: 'activo' | 'pendiente' | 'completado' | 'cancelada';
+  prioridad?: 'alta' | 'media' | 'baja';
+  notas?: string;
+  fecha_revision?: string;
+}
+
+export interface RecomendacionesQueryParams {
+  tipo?: string;
+  prioridad?: string;
+  estado?: string;
+  medico_id?: number;
+  fecha?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const getRecomendaciones = async (
+  params: RecomendacionesQueryParams = {},
+): Promise<RecomendacionListResponse> => {
+  const response = await api.get<RecomendacionListResponse>('/api/recomendaciones', { params });
+  return response.data;
+};
+
+export const updateRecomendacion = async (
+  id: number,
+  data: RecomendacionUpdatePayload,
+): Promise<RecomendacionResponse> => {
+  const response = await api.put<RecomendacionResponse>(`/api/recomendaciones/${id}`, data);
+  return response.data;
+};
 
 export interface RecomendacionResponse {
   id: number;

@@ -6,16 +6,11 @@ import {
   getDashboardResumen,
   getCitas,
   getCitaById,
-  createCita,
-  updateCita,
-  deleteCita,
   changeCitaEstado,
   getMedicos,
-  getPacientes,
+  getPacientesFiltered,
   createPaciente,
   getTriajeResumen,
-  createDatosClinicos,
-  updateDatosClinicos,
   createAndAnalizarDatosClinicos,
   updateAndAnalizarDatosClinicos,
 } from '../../services/api';
@@ -25,19 +20,25 @@ import type {
   MedicoResumen,
   PacienteResponse,
   PacienteCreate,
-  CitaCreate,
-  CitaUpdate,
   TriajeResumen,
 } from '../../services/api';
 import {
   DcAtenderFormView,
   atenderFormToPayload,
   emptyAtenderForm,
+  validateAtenderForm,
   type DcAtenderForm,
 } from '../../components/DatosClinicosAtenderForm';
+import { useUserRole } from '../../hooks/useUserRole';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import type { DatosClinicosResponse } from '../../services/api';
 import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
+import CreateCitaModal from '../citas/components/CreateCitaModal';
+import EditCitaModal, { type EditCitaForm } from '../citas/components/EditCitaModal';
+import DeleteCitaModal from '../citas/components/DeleteCitaModal';
+import { useCitaActions } from '../../hooks/useCitaActions';
+import AdminAnalyticsPanel from './AdminAnalyticsPanel';
+import OperativoDashboardPanel from './OperativoDashboardPanel';
 
 // ==================== TIPOS ADICIONALES ====================
 
@@ -71,8 +72,8 @@ interface PacientePerfilResponse {
 export default function DashboardOverview() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isDoctor = localStorage.getItem('user_role') === 'medico';
-  const isSecretary = localStorage.getItem('user_role') === 'secretaria';
+  const { isDoctor, isAdmin } = useUserRole();
+  const isSecretary = !isDoctor && !isAdmin;
 
   // Estados del Dashboard
   const [resumen, setResumen] = useState<DashboardResumen | null>(null);
@@ -140,20 +141,16 @@ export default function DashboardOverview() {
     duracion_minutos: 30
   });
   const [isCreatingCita, setIsCreatingCita] = useState<boolean>(false);
+  const [pacientesSinCitaList, setPacientesSinCitaList] = useState<PacienteResponse[]>([]);
 
   // 3. Editar Cita
-  const [editCitaForm, setEditCitaForm] = useState<{
-    fecha: string;
-    hora: string;
-    medico_id: string;
-    estado: 'programada' | 'en_atencion' | 'cumplida' | 'cancelada';
-    notas: string;
-  }>({
+  const [editCitaForm, setEditCitaForm] = useState<EditCitaForm>({
     fecha: '',
     hora: '',
     medico_id: '',
     estado: 'programada',
-    notas: ''
+    notas: '',
+    duracion_minutos: 30,
   });
   const [isUpdatingCita, setIsUpdatingCita] = useState<boolean>(false);
 
@@ -163,49 +160,58 @@ export default function DashboardOverview() {
     if (showLoader) setIsLoading(true);
     setErrorMsg(null);
     try {
-      // Obtener fecha actual en formato local YYYY-MM-DD
       const todayDate = new Date();
       const year = todayDate.getFullYear();
       const month = String(todayDate.getMonth() + 1).padStart(2, '0');
       const day = String(todayDate.getDate()).padStart(2, '0');
       const localTodayStr = `${year}-${month}-${day}`;
 
-      // Peticiones paralelas
       const requests: Promise<unknown>[] = [
         getDashboardResumen(),
         getCitas(localTodayStr),
         getCitas(),
         getMedicos(),
-        getPacientes('', 1, 100),
+        getPacientesFiltered({ estado: 'activo', limit: 100 }),
       ];
       if (isDoctor) {
         requests.push(getTriajeResumen());
       }
 
-      const results = await Promise.all(requests);
-      const resumenData = results[0] as DashboardResumen;
-      const citasHoyData = results[1] as CitaResponseEnriquecida[];
-      const allCitasData = results[2] as CitaResponseEnriquecida[];
-      const medicosData = results[3] as MedicoResumen[];
-      const pacientesData = results[4] as { items: PacienteResponse[] };
+      const results = await Promise.allSettled(requests);
 
-      setResumen(resumenData);
-      setAllCitas(allCitasData);
-      if (isDoctor && results[5]) {
-        setTriajeResumen(results[5] as TriajeResumen);
+      const resumenResult = results[0];
+      if (resumenResult.status === 'rejected') {
+        throw resumenResult.reason;
+      }
+      setResumen(resumenResult.value as DashboardResumen);
+
+      if (results[1].status === 'fulfilled') {
+        const citasHoyData = results[1].value as CitaResponseEnriquecida[];
+        const sortedCitas = [...citasHoyData].sort((a, b) =>
+          new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
+        );
+        setCitasHoy(sortedCitas);
       }
 
-      // Ordenar citas por fecha/hora cronológicamente
-      const sortedCitas = [...citasHoyData].sort((a, b) =>
-        new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()
-      );
-      setCitasHoy(sortedCitas);
-      
-      setMedicos(medicosData);
-      setPacientes(pacientesData.items);
+      if (results[2].status === 'fulfilled') {
+        setAllCitas(results[2].value as CitaResponseEnriquecida[]);
+      }
+
+      if (results[3].status === 'fulfilled') {
+        setMedicos(results[3].value as MedicoResumen[]);
+      }
+
+      if (results[4].status === 'fulfilled') {
+        const pacientesData = results[4].value as { items: PacienteResponse[] };
+        setPacientes(pacientesData.items);
+      }
+
+      if (isDoctor && results[5]?.status === 'fulfilled') {
+        setTriajeResumen(results[5].value as TriajeResumen);
+      }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Ocurrió un error al cargar la información del servidor. Por favor, verifica tu conexión.');
+      setErrorMsg('No se pudo cargar el resumen del dashboard. Verifica que el backend esté activo.');
     } finally {
       if (showLoader) setIsLoading(false);
     }
@@ -231,6 +237,17 @@ export default function DashboardOverview() {
       setToast(null);
     }, 4000);
   };
+
+  const closeCitaModal = () => setActiveModal(null);
+
+  const { handleCreate, handleUpdate, handleDelete, buildEditForm, buildNewForm } = useCitaActions({
+    isSecretary,
+    onSuccess: (msg) => showToastMsg(msg, 'success'),
+    onError: (msg) => showToastMsg(msg, 'error'),
+    onRefresh: () => loadData(false),
+    onCloseModal: closeCitaModal,
+    onCreated: (pacienteId) => setPacientesSinCitaList((prev) => prev.filter((p) => p.id !== pacienteId)),
+  });
 
   // ==================== CONTROL DEL CALENDARIO ====================
 
@@ -306,76 +323,13 @@ export default function DashboardOverview() {
   // ==================== HANDLERS CREAR CITA ====================
 
   const handleOpenCreateModal = (patientId?: number) => {
-    const now = new Date();
-    // Formatear hoy local YYYY-MM-DD
-    const localDate = now.toISOString().split('T')[0];
-    
-    // Obtener hora redondeada
-    const hours = String(now.getHours() + 1).padStart(2, '0');
-    const minutes = '00';
-    const localTime = `${hours}:${minutes}`;
-
+    const form = buildNewForm();
     setNewCita({
+      ...form,
       paciente_id: patientId ? String(patientId) : '',
-      medico_id: '',
-      fecha: localDate,
-      hora: localTime,
-      notas: '',
-      duracion_minutos: 30
     });
     setPreselectedPatientId(patientId || null);
     setActiveModal('create');
-  };
-
-  const handleCreateCitaSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!newCita.paciente_id || !newCita.fecha || !newCita.hora) {
-      showToastMsg('Por favor, selecciona paciente, fecha y hora', 'error');
-      return;
-    }
-
-    const pacienteSel = pacientes.find(p => p.id === Number(newCita.paciente_id));
-    const medicoId = isSecretary
-      ? pacienteSel?.medico_asignado_id
-      : Number(newCita.medico_id);
-
-    if (!medicoId) {
-      showToastMsg(
-        isSecretary
-          ? 'La paciente no tiene médico asignado. Asigne un médico en el expediente antes de agendar.'
-          : 'Por favor, selecciona un médico',
-        'error',
-      );
-      return;
-    }
-
-    setIsCreatingCita(true);
-    try {
-      const datetimeStr = `${newCita.fecha}T${newCita.hora}:00`;
-      
-      const payload: CitaCreate = {
-        paciente_id: Number(newCita.paciente_id),
-        medico_id: medicoId,
-        fecha_hora: datetimeStr,
-        duracion_minutos: newCita.duracion_minutos,
-        notas: newCita.notas
-      };
-
-      await createCita(payload);
-      showToastMsg('Cita programada con éxito', 'success');
-      setActiveModal(null);
-      
-      // Actualizar localmente la lista de pacientes sin cita para reflejar el cambio inmediato
-      setPacientesSinCitaList(prev => prev.filter(p => p.id !== Number(newCita.paciente_id)));
-
-      await loadData(false);
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.detail || 'No se pudo programar la cita. Verifica la disponibilidad del médico.';
-      showToastMsg(msg, 'error');
-    } finally {
-      setIsCreatingCita(false);
-    }
   };
 
   // ==================== HANDLERS EDITAR CITA ====================
@@ -383,56 +337,8 @@ export default function DashboardOverview() {
   const handleOpenEditModal = (cita: CitaResponseEnriquecida) => {
     setSelectedCitaId(cita.id);
     setSelectedCitaDetail(cita);
-    
-    // Dividir fecha_hora
-    const dt = new Date(cita.fecha_hora);
-    
-    const year = dt.getFullYear();
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const day = String(dt.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    
-    const hours = String(dt.getHours()).padStart(2, '0');
-    const minutes = String(dt.getMinutes()).padStart(2, '0');
-    const timeStr = `${hours}:${minutes}`;
-
-    setEditCitaForm({
-      fecha: dateStr,
-      hora: timeStr,
-      medico_id: String(cita.medico_id),
-      estado: cita.estado,
-      notas: cita.notas || ''
-    });
-    
+    setEditCitaForm(buildEditForm(cita));
     setActiveModal('edit');
-  };
-
-  const handleEditCitaSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedCitaId) return;
-
-    setIsUpdatingCita(true);
-    try {
-      const datetimeStr = `${editCitaForm.fecha}T${editCitaForm.hora}:00`;
-      
-      const payload: CitaUpdate = {
-        fecha_hora: datetimeStr,
-        medico_id: Number(editCitaForm.medico_id),
-        estado: editCitaForm.estado,
-        notas: editCitaForm.notas
-      };
-
-      await updateCita(selectedCitaId, payload);
-      showToastMsg('Cita actualizada exitosamente', 'success');
-      setActiveModal(null);
-      await loadData(false);
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.detail || 'No se pudo actualizar la cita.';
-      showToastMsg(msg, 'error');
-    } finally {
-      setIsUpdatingCita(false);
-    }
   };
 
   // ==================== HANDLERS DETALLE CITA ====================
@@ -513,6 +419,11 @@ export default function DashboardOverview() {
   const handleAtender = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedCitaDetail) return;
+    const validationError = validateAtenderForm(atenderDcForm);
+    if (validationError) {
+      showToastMsg(validationError, 'error');
+      return;
+    }
     setIsSavingAtender(true);
     try {
       const payload = atenderFormToPayload(atenderDcForm, existingDc);
@@ -545,23 +456,8 @@ export default function DashboardOverview() {
     setActiveModal('delete');
   };
 
-  const handleConfirmDelete = async () => {
-    if (!selectedCitaId) return;
-    try {
-      await deleteCita(selectedCitaId);
-      showToastMsg('La cita ha sido cancelada exitosamente', 'success');
-      setActiveModal(null);
-      await loadData(false);
-    } catch (err: any) {
-      console.error(err);
-      const msg = err.response?.data?.detail || 'No se pudo cancelar la cita.';
-      showToastMsg(msg, 'error');
-    }
-  };
-
   // ==================== PACIENTES SIN CITA MODAL ====================
 
-  const [pacientesSinCitaList, setPacientesSinCitaList] = useState<PacienteResponse[]>([]);
   const [isLoadingSinCita, setIsLoadingSinCita] = useState<boolean>(false);
 
   const handleOpenPatientsWithoutAppointment = () => {
@@ -690,16 +586,18 @@ export default function DashboardOverview() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            {isDoctor ? 'Panel Médico' : 'Panel de Control Obstétrico'}
+            {isDoctor ? 'Panel Médico' : isAdmin ? 'Panel Administrativo' : 'Panel de Control Obstétrico'}
           </h1>
           <p className="text-sm sm:text-base text-gray-500">
             {isDoctor
               ? 'Citas pendientes de atención y alertas de riesgo prenatal.'
-              : 'Gestión de citas y monitoreo de alertas de parto prematuro en tiempo real.'}
+              : isAdmin
+                ? 'Métricas del sistema, citas y evolución del riesgo prenatal.'
+                : 'Gestión de citas y monitoreo de alertas de parto prematuro en tiempo real.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {(isDoctor || localStorage.getItem('user_role') === 'administrador') && (
+          {(isDoctor || isAdmin) && (
             <button
               onClick={() => setShowExpedienteModal(true)}
               className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl font-bold text-white shadow-md shadow-fuchsia-950/10 hover:opacity-95 active:scale-95 transition-all duration-150"
@@ -816,6 +714,12 @@ export default function DashboardOverview() {
 
       </div>
 
+      <OperativoDashboardPanel />
+
+      {isAdmin && (
+        <AdminAnalyticsPanel />
+      )}
+
       {/* DISPOSICIÓN DE DOS COLUMNAS (70% - 30%) */}
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
         
@@ -878,7 +782,7 @@ export default function DashboardOverview() {
                         <div className="font-semibold text-gray-900 leading-tight">
                           {cita.paciente_nombre || 'Paciente no identificada'}
                         </div>
-                        <span className="text-[10px] text-gray-400 font-medium block mt-0.5">DNI {cita.paciente_id}</span>
+                        <span className="text-[10px] text-gray-400 font-medium block mt-0.5">DNI {cita.paciente_dni ?? '—'}</span>
                       </td>
                       <td className="py-3.5 px-4 text-gray-600 font-medium whitespace-nowrap">
                         {cita.medico_nombre ? `Dr. ${cita.medico_nombre.split(' ')[0]}` : '--'}
@@ -1120,326 +1024,33 @@ export default function DashboardOverview() {
         </div>
       )}
       {activeModal === 'create' && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-extrabold text-lg text-gray-900">Agendar Nueva Cita</h3>
-              <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <form onSubmit={handleCreateCitaSubmit} className="p-6 space-y-4">
-              
-              {/* Paciente */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Paciente (Gestante) *</label>
-                <select
-                  required
-                  value={newCita.paciente_id}
-                  onChange={(e) => setNewCita(prev => ({ ...prev, paciente_id: e.target.value }))}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                >
-                  <option value="">Seleccionar Paciente</option>
-                  {pacientes.map(p => (
-                    <option key={p.id} value={p.id}>{p.nombre} {p.apellidos} (DNI {p.dni})</option>
-                  ))}
-                </select>
-                {preselectedPatientId && (
-                  <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">✓ Paciente pre-seleccionada</span>
-                )}
-              </div>
-
-              {!isSecretary && (
-              <>
-              {/* Médico / Obstetra */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Obstetra Médico *</label>
-                <select
-                  required
-                  value={newCita.medico_id}
-                  onChange={(e) => setNewCita(prev => ({ ...prev, medico_id: e.target.value }))}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                >
-                  <option value="">Seleccionar Médico</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-                  ))}
-                </select>
-              </div>
-              </>
-              )}
-
-              {isSecretary && newCita.paciente_id && (() => {
-                const p = pacientes.find(x => x.id === Number(newCita.paciente_id));
-                const med = p?.medico_asignado_id ? medicos.find(m => m.id === p.medico_asignado_id) : null;
-                return (
-                  <div className="p-3 rounded-xl bg-fuchsia-50/50 border border-fuchsia-100 text-xs text-gray-600">
-                    {med
-                      ? <>Médico asignado: <strong className="text-gray-800">Dr. {med.nombre} {med.apellidos}</strong></>
-                      : <span className="text-amber-700 font-semibold">Esta paciente no tiene médico asignado.</span>}
-                  </div>
-                );
-              })()}
-
-              {/* Fecha y Hora */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Fecha *</label>
-                  <input
-                    type="date"
-                    required
-                    value={newCita.fecha}
-                    onChange={(e) => setNewCita(prev => ({ ...prev, fecha: e.target.value }))}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Hora *</label>
-                  <input
-                    type="time"
-                    required
-                    value={newCita.hora}
-                    onChange={(e) => setNewCita(prev => ({ ...prev, hora: e.target.value }))}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                  />
-                </div>
-              </div>
-
-              {/* Duración en Minutos */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Duración de la consulta</label>
-                  <span className="text-xs font-bold text-fuchsia-950">{newCita.duracion_minutos} minutos</span>
-                </div>
-                <input
-                  type="range"
-                  min="15"
-                  max="120"
-                  step="15"
-                  value={newCita.duracion_minutos}
-                  onChange={(e) => setNewCita(prev => ({ ...prev, duracion_minutos: Number(e.target.value) }))}
-                  className="w-full accent-fuchsia-900 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-
-              {/* Notas Adicionales */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notas o Comentarios</label>
-                <textarea
-                  rows={3}
-                  value={newCita.notas}
-                  onChange={(e) => setNewCita(prev => ({ ...prev, notas: e.target.value }))}
-                  placeholder="Síntomas iniciales, antecedentes, requerimientos especiales..."
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-850"
-                />
-              </div>
-
-              {/* Footer */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  className="py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingCita}
-                  className="py-2.5 px-6 rounded-xl text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: '#612853' }}
-                >
-                  {isCreatingCita ? 'Programando...' : 'Programar Cita'}
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
+        <CreateCitaModal
+          form={newCita}
+          medicos={medicos}
+          isSecretary={isSecretary}
+          isSaving={isCreatingCita}
+          onClose={closeCitaModal}
+          onChange={setNewCita}
+          onSubmit={(e) => handleCreate(e, newCita, setIsCreatingCita)}
+        />
       )}
 
-      {/* ==================== MODAL: EDITAR CITA ==================== */}
-      {activeModal === 'edit' && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-extrabold text-lg text-gray-900">Editar Cita Médica</h3>
-              <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <form onSubmit={handleEditCitaSubmit} className="p-6 space-y-4">
-              
-              {/* Paciente y Riesgo (Lectura únicamente) */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Paciente (No editable)</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={selectedCitaDetail?.paciente_nombre || ''}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-                  />
-                </div>
-                <div>
-                  {/* riesgo prenatal (DESHABILITADO) */}
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Riesgo Prenatal (SAT)</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={(selectedCitaDetail?.nivel_riesgo || 'Bajo').toUpperCase()}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed font-extrabold tracking-wide uppercase"
-                  />
-                </div>
-              </div>
-
-              {/* próxima revisión (DESHABILITADO) */}
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Próxima Revisión Estimada (SAT)</label>
-                <input
-                  type="text"
-                  disabled
-                  value={
-                    selectedCitaDetail?.nivel_riesgo?.toLowerCase() === 'critico' || selectedCitaDetail?.nivel_riesgo?.toLowerCase() === 'alto'
-                      ? 'Revisión prioritaria cada 7 días'
-                      : 'Revisión ordinaria cada 14 a 28 días'
-                  }
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed font-medium"
-                />
-              </div>
-
-              {/* Obstetra (Editable) */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Obstetra Médico / Doctor *</label>
-                <select
-                  required
-                  value={editCitaForm.medico_id}
-                  onChange={(e) => setEditCitaForm(prev => ({ ...prev, medico_id: e.target.value }))}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                >
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Fecha y Hora (Editables) */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Nueva Fecha *</label>
-                  <input
-                    type="date"
-                    required
-                    value={editCitaForm.fecha}
-                    onChange={(e) => setEditCitaForm(prev => ({ ...prev, fecha: e.target.value }))}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Nueva Hora *</label>
-                  <input
-                    type="time"
-                    required
-                    value={editCitaForm.hora}
-                    onChange={(e) => setEditCitaForm(prev => ({ ...prev, hora: e.target.value }))}
-                    className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                  />
-                </div>
-              </div>
-
-              {/* Estado de la Cita (Editable) */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Estado actual de la cita *</label>
-                <select
-                  required
-                  value={editCitaForm.estado}
-                  onChange={(e) => setEditCitaForm(prev => ({ ...prev, estado: e.target.value as any }))}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-800"
-                >
-                  <option value="programada">Programada</option>
-                  <option value="en_atencion">En Atención / Consulta</option>
-                  <option value="cumplida">Cumplida / Atendida</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-              </div>
-
-              {/* Notas (Editable) */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notas Clínicas o Comentarios</label>
-                <textarea
-                  rows={3}
-                  value={editCitaForm.notas}
-                  onChange={(e) => setEditCitaForm(prev => ({ ...prev, notas: e.target.value }))}
-                  placeholder="Añadir observaciones..."
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-fuchsia-900/25 bg-gray-50 text-gray-850"
-                />
-              </div>
-
-              {/* Footer */}
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  className="py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50"
-                >
-                  Descartar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isUpdatingCita}
-                  className="py-2.5 px-6 rounded-xl text-sm font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
-                  style={{ backgroundColor: '#612853' }}
-                >
-                  {isUpdatingCita ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
+      {activeModal === 'edit' && selectedCitaDetail && (
+        <EditCitaModal
+          cita={selectedCitaDetail}
+          form={editCitaForm}
+          medicos={medicos}
+          isSaving={isUpdatingCita}
+          showAgendaActions={isSecretary}
+          onClose={closeCitaModal}
+          onChange={setEditCitaForm}
+          onSubmit={(e) => selectedCitaId && handleUpdate(e, selectedCitaId, editCitaForm, setIsUpdatingCita)}
+          onActionDone={(msg) => { showToastMsg(msg, 'success'); loadData(false); }}
+        />
       )}
 
-      {/* ==================== MODAL: ELIMINAR/CANCELAR CITA ==================== */}
-      {activeModal === 'delete' && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in">
-            <div className="p-6 text-center space-y-4">
-              <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center text-red-500 mx-auto border border-red-200">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-extrabold text-lg text-gray-950">¿Cancelar esta cita?</h3>
-                <p className="text-sm text-gray-500 mt-2">
-                  Esta acción marcará la cita como <strong>"cancelada"</strong> en el sistema de manera definitiva. Esta operación no se puede deshacer.
-                </p>
-              </div>
-              <div className="pt-4 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActiveModal(null)}
-                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50"
-                >
-                  Volver atrás
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-sm transition-colors"
-                >
-                  Confirmar cancelación
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {activeModal === 'delete' && selectedCitaId && (
+        <DeleteCitaModal onClose={closeCitaModal} onConfirm={() => handleDelete(selectedCitaId)} />
       )}
 
       {/* ==================== MODAL: DETALLE CITA Y HISTORIAL CLÍNICO ==================== */}
@@ -1482,7 +1093,7 @@ export default function DashboardOverview() {
                     </div>
                     <div>
                       <h4 className="font-extrabold text-gray-950 text-base">{selectedCitaDetail?.paciente_nombre}</h4>
-                      <p className="text-xs text-gray-500 font-medium">DNI: {selectedCitaDetail?.paciente_id} | Edad Gestacional: <span className="font-semibold text-gray-800">{selectedCitaDetail?.semanas_gestacion ?? '--'} semanas</span></p>
+                      <p className="text-xs text-gray-500 font-medium">DNI: {selectedCitaDetail?.paciente_dni ?? '—'} | Edad Gestacional: <span className="font-semibold text-gray-800">{selectedCitaDetail?.semanas_gestacion ?? '--'} semanas</span></p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">

@@ -70,6 +70,20 @@ export function hasActiveInfection(form: Pick<DcAtenderForm, InfectionField>): b
   return INFECTION_FIELDS.some(field => form[field]);
 }
 
+/** Valida campos obligatorios antes de ejecutar el pipeline ML. */
+export function validateAtenderForm(form: DcAtenderForm): string | null {
+  if (!form.edad_gestacional_semanas || Number(form.edad_gestacional_semanas) <= 0) {
+    return 'La edad gestacional (semanas) es obligatoria';
+  }
+  if (form.longitud_cervical_mm === '' || Number.isNaN(Number(form.longitud_cervical_mm))) {
+    return 'La longitud cervical (mm) es obligatoria';
+  }
+  if (!form.bmi || Number(form.bmi) <= 0) {
+    return 'El IMC (BMI) es obligatorio';
+  }
+  return null;
+}
+
 export function atenderFormFromResponse(
   dc: DatosClinicosResponse,
   edadMadre?: number | null,
@@ -177,21 +191,21 @@ export function DcAtenderFormView({ form, onChange }: DcAtenderFormViewProps) {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Edad gestacional (semanas)</label>
-            <input type="number" min="20" max="45" value={form.edad_gestacional_semanas}
+            <input type="number" min="20" max="45" required value={form.edad_gestacional_semanas}
               onChange={e => setField('edad_gestacional_semanas', e.target.value)}
               placeholder="20–45"
               className={inputCls} style={{ borderColor: borderNormal }} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Longitud cervical (mm)</label>
-            <input type="number" min="0" step="0.1" value={form.longitud_cervical_mm}
+            <input type="number" min="0" step="0.1" required value={form.longitud_cervical_mm}
               onChange={e => setField('longitud_cervical_mm', e.target.value)}
               placeholder="Ej. 25.5"
               className={inputCls} style={{ borderColor: borderNormal }} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Índice de masa corporal (IMC)</label>
-            <input type="number" min="10" max="60" step="0.1" value={form.bmi}
+            <input type="number" min="10" max="60" step="0.1" required value={form.bmi}
               onChange={e => setField('bmi', e.target.value)}
               placeholder="Ej. 24.5"
               className={inputCls} style={{ borderColor: borderNormal }} />

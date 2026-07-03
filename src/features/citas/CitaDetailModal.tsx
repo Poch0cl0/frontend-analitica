@@ -6,6 +6,7 @@ import {
   getStatusBadgeStyles,
   getStatusLabel,
 } from './citaUiUtils';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface CitaDetailModalProps {
   cita: CitaResponseEnriquecida | null;
@@ -31,11 +32,12 @@ export default function CitaDetailModal({
   if (!cita) return null;
 
   const canAtender = cita.estado === 'programada' || cita.estado === 'en_atencion';
+  const backdrop = useModalBackdrop(onClose);
 
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden animate-zoom-in"

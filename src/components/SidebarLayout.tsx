@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNav } from '../contexts/NavContext';
+import { getRoleLabel, normalizeRole } from '../utils/role';
 
 interface SidebarLayoutProps {
   children: ReactNode;
@@ -113,24 +114,16 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const { dynamicTitle, dynamicBreadcrumb } = useNav();
-  const userRole = localStorage.getItem('user_role') || 'medico';
+  const userRole = normalizeRole(localStorage.getItem('user_role'));
   const isSecretary = userRole === 'secretaria';
-  const userEmail = localStorage.getItem('user_email') || '';
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'administrador': return 'Administrador';
-      case 'secretaria': return 'Secretaría';
-      case 'medico':
-      default: return 'Médico Obstetra';
-    }
-  };
+  const userUsername = localStorage.getItem('user_username') || localStorage.getItem('user_email') || '';
 
   const getUserInitials = () => {
-    if (userEmail) {
-      const parts = userEmail.split('@')[0].split('.');
+    if (userUsername) {
+      const base = userUsername.includes('@') ? userUsername.split('@')[0] : userUsername;
+      const parts = base.split('.');
       if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-      return parts[0].substring(0, 2).toUpperCase();
+      return base.substring(0, 2).toUpperCase();
     }
     return getRoleLabel(userRole).substring(0, 2).toUpperCase();
   };
@@ -138,7 +131,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user_role');
+    localStorage.removeItem('user_username');
     localStorage.removeItem('user_email');
+    localStorage.removeItem('user_id');
     navigate('/');
   };
 
@@ -220,7 +215,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white truncate">
-              {userEmail || 'Usuario'}
+              {userUsername || 'Usuario'}
             </p>
             <p className="text-xs text-white/60 font-medium truncate">{getRoleLabel(userRole)}</p>
           </div>
@@ -319,7 +314,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               </div>
               <div className="hidden sm:block">
                 <p className="text-xs font-semibold text-gray-800 leading-tight truncate max-w-[100px]">
-                  {userEmail ? userEmail.split('@')[0] : 'Usuario'}
+                  {userUsername ? (userUsername.includes('@') ? userUsername.split('@')[0] : userUsername) : 'Usuario'}
                 </p>
                 <p className="text-[10px] text-gray-400 font-medium leading-tight">{getRoleLabel(userRole)}</p>
               </div>

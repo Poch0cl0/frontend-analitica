@@ -8,6 +8,7 @@ import {
   createPaciente,
   updatePaciente,
   deletePaciente,
+  getCitasFuturasPaciente,
 } from '../../services/api';
 import type {
   PacienteResponse,
@@ -16,6 +17,13 @@ import type {
   PacienteCreate,
   PacienteUpdatePayload,
 } from '../../services/api';
+
+import {
+  sanitizeDigits,
+  validateDni,
+  validatePhonePeru,
+} from '../../utils/patientValidation';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 const PRIMARY = '#612853';
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -66,10 +74,11 @@ interface PatientModalProps {
 
 function PatientModal({ mode, form, isSaving, onClose, onSubmit, onChange }: PatientModalProps) {
   const edad = form.fecha_nacimiento ? calcEdad(form.fecha_nacimiento) : '';
+  const backdrop = useModalBackdrop(onClose);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
-         onClick={onClose}>
+         {...backdrop}>
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
            onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -124,11 +133,23 @@ function PatientModal({ mode, form, isSaving, onClose, onSubmit, onChange }: Pat
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">DNI *</label>
-                  <input name="dni" required value={form.dni} onChange={onChange} placeholder="8 dígitos"
-                    className="w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all"
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    DNI {mode === 'edit' ? '(no editable)' : '*'}
+                  </label>
+                  <input
+                    name="dni"
+                    required={mode === 'create'}
+                    readOnly={mode === 'edit'}
+                    value={form.dni}
+                    onChange={onChange}
+                    placeholder="8 dígitos"
+                    inputMode="numeric"
+                    maxLength={8}
+                    className={`w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all ${
+                      mode === 'edit' ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''
+                    }`}
                     style={{ borderColor: '#E8D5EF' }}
-                    onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
+                    onFocus={e => { if (mode !== 'edit') e.currentTarget.style.borderColor = PRIMARY; }}
                     onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'}
                   />
                 </div>
@@ -153,7 +174,13 @@ function PatientModal({ mode, form, isSaving, onClose, onSubmit, onChange }: Pat
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Teléfono principal</label>
-                  <input name="telefono_principal" value={form.telefono_principal} onChange={onChange} placeholder="999 000 000"
+                  <input
+                    name="telefono_principal"
+                    value={form.telefono_principal}
+                    onChange={onChange}
+                    placeholder="9XXXXXXXX"
+                    inputMode="numeric"
+                    maxLength={9}
                     className="w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all"
                     style={{ borderColor: '#E8D5EF' }}
                     onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
@@ -231,11 +258,15 @@ export default function PacientesPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'delete' | null>(null);
   const [selectedPaciente, setSelectedPaciente] = useState<PacienteResponse | null>(null);
+  const [citasFuturasDelete, setCitasFuturasDelete] = useState<number | null>(null);
+  const [loadingCitasFuturas, setLoadingCitasFuturas] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<PatientForm>(emptyForm);
 
   const medicoMap: Record<number, MedicoResumen> = {};
   medicos.forEach(m => { medicoMap[m.id] = m; });
+  const closeModal = () => setActiveModal(null);
+  const deleteBackdrop = useModalBackdrop(closeModal);
 
   // ── LOAD DATA ──────────────────────────────────────────────────────────────
   const loadPacientes = useCallback(async () => {
@@ -283,7 +314,16 @@ export default function PacientesPage() {
 
   // ── FORM HANDLER ──────────────────────────────────────────────────────────
   const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    if (name === 'telefono_principal') {
+      setForm(prev => ({ ...prev, telefono_principal: sanitizeDigits(value, 9) }));
+      return;
+    }
+    if (name === 'dni') {
+      setForm(prev => ({ ...prev, dni: sanitizeDigits(value, 8) }));
+      return;
+    }
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
   // ── CREATE ─────────────────────────────────────────────────────────────────
@@ -294,6 +334,12 @@ export default function PacientesPage() {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
+    const dniErr = validateDni(form.dni);
+    const phoneErr = validatePhonePeru(form.telefono_principal);
+    if (dniErr || phoneErr) {
+      showToast(dniErr || phoneErr || 'Datos inválidos', 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       const payload: PacienteCreate = {
@@ -332,6 +378,11 @@ export default function PacientesPage() {
   const handleEdit = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedPaciente) return;
+    const phoneErr = validatePhonePeru(form.telefono_principal);
+    if (phoneErr) {
+      showToast(phoneErr, 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       const payload: PacienteUpdatePayload = {
@@ -352,19 +403,46 @@ export default function PacientesPage() {
     }
   };
 
+  const handleReactivar = async (p: PacienteResponse) => {
+    setIsSaving(true);
+    try {
+      await updatePaciente(p.id, { activo: true });
+      showToast('Paciente reactivada correctamente', 'success');
+      await loadPacientes();
+    } catch (err: any) {
+      showToast(err?.response?.data?.detail || 'Error al reactivar paciente', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // ── DELETE ─────────────────────────────────────────────────────────────────
-  const handleOpenDelete = (p: PacienteResponse) => {
+  const handleOpenDelete = async (p: PacienteResponse) => {
     setSelectedPaciente(p);
+    setCitasFuturasDelete(null);
     setActiveModal('delete');
+    setLoadingCitasFuturas(true);
+    try {
+      const total = await getCitasFuturasPaciente(p.id);
+      setCitasFuturasDelete(total);
+    } catch {
+      setCitasFuturasDelete(null);
+    } finally {
+      setLoadingCitasFuturas(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!selectedPaciente) return;
     setIsSaving(true);
     try {
-      await deletePaciente(selectedPaciente.id);
-      showToast('Paciente desactivada del sistema', 'success');
+      const { citas_canceladas } = await deletePaciente(selectedPaciente.id);
+      const extra = citas_canceladas > 0
+        ? ` Se cancelaron ${citas_canceladas} cita(s) programada(s).`
+        : '';
+      showToast(`Paciente desactivada del sistema.${extra}`, 'success');
       setActiveModal(null);
+      setCitasFuturasDelete(null);
       await loadPacientes();
     } catch (err: any) {
       showToast(err?.response?.data?.detail || 'Error al desactivar paciente', 'error');
@@ -412,7 +490,9 @@ export default function PacientesPage() {
               {isDoctor ? 'Mis Pacientes' : 'Pacientes'}
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              {isDoctor ? 'Pacientes asignados a tu consulta' : 'Gestión de pacientes registradas'}
+              {isDoctor
+                ? 'Pacientes asignados a tu consulta · ordenados por cita de hoy y próximas citas'
+                : 'Gestión de pacientes registradas'}
             </p>
           </div>
           {!isDoctor && (
@@ -582,8 +662,8 @@ export default function PacientesPage() {
                             </button>
                           )}
 
-                          {/* Secretaria: desactivar */}
-                          {!isDoctor && (
+                          {/* Secretaria: desactivar / reactivar */}
+                          {!isDoctor && p.activo && (
                             <button onClick={() => handleOpenDelete(p)}
                               title="Desactivar paciente"
                               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-semibold border border-red-100">
@@ -591,6 +671,16 @@ export default function PacientesPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                               </svg>
                               <span className="hidden sm:inline">Desactivar</span>
+                            </button>
+                          )}
+                          {!isDoctor && !p.activo && (
+                            <button onClick={() => handleReactivar(p)}
+                              title="Reactivar paciente"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-semibold border border-emerald-100">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="hidden sm:inline">Reactivar</span>
                             </button>
                           )}
                         </div>
@@ -703,28 +793,39 @@ export default function PacientesPage() {
       {/* Delete confirmation (solo secretaria) */}
       {!isDoctor && activeModal === 'delete' && selectedPaciente && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-             onClick={() => setActiveModal(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4"
+             {...deleteBackdrop}>
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl p-8 space-y-5"
                onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto">
-              <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <div>
-              <h3 className="text-lg font-extrabold text-gray-900">¿Desactivar paciente?</h3>
-              <p className="text-sm text-gray-500 mt-2">
-                Se desactivará a <strong>{selectedPaciente.nombre} {selectedPaciente.apellidos}</strong> del sistema. Podrá ser reactivada posteriormente.
+            <div className="text-center space-y-3">
+              <h3 className="text-xl font-extrabold text-gray-900">¿Desactivar paciente?</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                <strong>{selectedPaciente.nombre} {selectedPaciente.apellidos}</strong> dejará de aparecer en listados activos
+                y no podrá recibir nuevas citas. <strong>No se eliminan sus datos</strong> del expediente; puede reactivarse cuando lo necesite.
               </p>
+              {loadingCitasFuturas ? (
+                <p className="text-xs text-gray-500">Consultando citas programadas...</p>
+              ) : citasFuturasDelete !== null && citasFuturasDelete > 0 ? (
+                <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-left text-sm text-red-800">
+                  <p className="font-semibold">Citas que se cancelarán automáticamente: {citasFuturasDelete}</p>
+                  <p className="text-xs mt-1 text-red-700">Solo citas futuras en estado programada o en atención.</p>
+                </div>
+              ) : citasFuturasDelete === 0 ? (
+                <p className="text-xs text-gray-500">No tiene citas futuras programadas.</p>
+              ) : null}
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setActiveModal(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">
+              <button onClick={() => { setActiveModal(null); setCitasFuturasDelete(null); }}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">
                 Cancelar
               </button>
               <button onClick={handleDelete} disabled={isSaving}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors">
-                {isSaving ? 'Desactivando...' : 'Confirmar'}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors">
+                {isSaving ? 'Desactivando...' : 'Confirmar desactivación'}
               </button>
             </div>
           </div>

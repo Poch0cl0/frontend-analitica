@@ -111,6 +111,7 @@ export default function RecomendacionesPacientePage() {
         <div className="flex flex-wrap items-center gap-2 bg-gray-50 border border-gray-200 p-1.5 rounded-xl self-start md:self-auto">
           <div className="flex flex-col px-2">
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Modelo Recomendador</span>
+            <p className="text-[9px] text-amber-600 font-medium mb-0.5">Vista histórica — S-4 productivo usa Gemini</p>
             <select
               value={modeloSeleccionado}
               onChange={(e) => setModeloSeleccionado(e.target.value as AlgoritmoS4)}

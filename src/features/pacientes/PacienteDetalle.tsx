@@ -26,15 +26,22 @@ import type {
   CitaUpdate,
   DatosClinicosResponse,
 } from '../../services/api';
+import { sanitizeDigits, validatePhonePeru } from '../../utils/patientValidation';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 import {
   DcAtenderFormView,
   atenderFormFromResponse,
   atenderFormToPayload,
   emptyAtenderForm,
+  validateAtenderForm,
   type DcAtenderForm,
 } from '../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
+import { formatLocalDate } from '../../utils/date';
 import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
+import PacienteCitaModal, { type CitaFormData } from './components/PacienteCitaModal';
+import DeleteCitaModal from '../citas/components/DeleteCitaModal';
+
 
 const PRIMARY = '#612853';
 
@@ -75,137 +82,6 @@ function getStatusLabel(estado: string) {
   return map[estado] || estado;
 }
 
-// ── CITA MODAL (secretaria / admin) ───────────────────────────────────────────
-interface CitaFormData {
-  fecha: string;
-  hora: string;
-  medico_id: string;
-  duracion_minutos: number;
-  notas: string;
-}
-
-interface CitaModalProps {
-  mode: 'create' | 'edit';
-  form: CitaFormData;
-  pacienteNombre: string;
-  medicos: MedicoResumen[];
-  isSaving: boolean;
-  simplified?: boolean;
-  medicoAsignadoLabel?: string | null;
-  onClose: () => void;
-  onSubmit: (e: FormEvent) => void;
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
-  onDuracionChange: (v: number) => void;
-}
-
-function CitaModal({ mode, form, pacienteNombre, medicos, isSaving, simplified, medicoAsignadoLabel, onClose, onSubmit, onChange, onDuracionChange }: CitaModalProps) {
-  const inputCls = "w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all bg-white";
-  const borderStyle = { borderColor: '#E8D5EF' };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
-         onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
-           onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#F5EDF2' }}>
-              <svg className="w-5 h-5" style={{ color: PRIMARY }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h2 className="text-base font-bold text-gray-900">
-              {mode === 'create' ? 'Nueva Cita Médica' : 'Editar Cita Médica'}
-            </h2>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1">
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div className="flex items-center gap-2 mb-2 pl-3" style={{ borderLeft: `3px solid ${PRIMARY}` }}>
-            <span className="text-sm font-bold text-gray-800">Datos de la Cita</span>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Paciente</label>
-            <input readOnly value={pacienteNombre} className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed`} style={borderStyle} />
-          </div>
-          {simplified && mode === 'create' ? (
-            medicoAsignadoLabel ? (
-              <div className="p-3 rounded-xl bg-fuchsia-50/50 border border-fuchsia-100 text-xs text-gray-600">
-                Médico asignado: <strong className="text-gray-800">{medicoAsignadoLabel}</strong>
-              </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-800 font-semibold">
-                Esta paciente no tiene médico asignado.
-              </div>
-            )
-          ) : (
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Obstetra Médico *</label>
-            <select name="medico_id" required value={form.medico_id} onChange={onChange}
-              className={inputCls} style={borderStyle}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'}>
-              <option value="">Seleccionar médico</option>
-              {medicos.map(m => <option key={m.id} value={m.id}>Dr. {m.nombre} {m.apellidos}</option>)}
-            </select>
-          </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha *</label>
-              <input type="date" name="fecha" required value={form.fecha} onChange={onChange}
-                className={inputCls} style={borderStyle}
-                onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-                onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Hora *</label>
-              <input type="time" name="hora" required value={form.hora} onChange={onChange}
-                className={inputCls} style={borderStyle}
-                onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-                onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'} />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-semibold text-gray-500">Duración de la consulta</label>
-              <span className="text-xs font-bold" style={{ color: PRIMARY }}>{form.duracion_minutos} min</span>
-            </div>
-            <input type="range" min="15" max="120" step="15" value={form.duracion_minutos}
-              onChange={e => onDuracionChange(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              style={{ accentColor: PRIMARY }} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Notas o Comentarios</label>
-            <textarea name="notas" rows={3} value={form.notas} onChange={onChange as any}
-              placeholder="Síntomas iniciales, antecedentes..."
-              className={`${inputCls} resize-none`} style={borderStyle}
-              onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
-              onBlur={e => e.currentTarget.style.borderColor = '#E8D5EF'} />
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 text-gray-700 hover:bg-gray-50"
-              style={{ borderColor: '#E8D5EF' }}>Cancelar</button>
-            <button type="submit" disabled={isSaving}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 shadow-sm"
-              style={{ backgroundColor: PRIMARY }}>
-              {isSaving ? 'Guardando...' : mode === 'create' ? 'Agendar Cita' : 'Guardar Cambios'}
-            </button>
-          </div>
-        </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 type TabType = 'personal' | 'clinico' | 'citas';
 
@@ -241,6 +117,7 @@ export default function PacienteDetalle() {
     telefono_principal: '', email: '',
   });
   const [isSavingPatient, setIsSavingPatient] = useState(false);
+  const editPatientBackdrop = useModalBackdrop(() => setShowEditPatient(false));
 
   // Cita modals (secretaria)
   const [citaModal, setCitaModal] = useState<'create' | 'edit' | 'delete' | null>(null);
@@ -363,6 +240,11 @@ export default function PacienteDetalle() {
   const handleAtender = async (e: FormEvent) => {
     e.preventDefault();
     if (!atenderCita || !paciente) return;
+    const validationError = validateAtenderForm(atenderDcForm);
+    if (validationError) {
+      showToast(validationError, 'error');
+      return;
+    }
     setIsSavingAtender(true);
     try {
       const payload = atenderFormToPayload(atenderDcForm, atenderExistingDc);
@@ -405,6 +287,11 @@ export default function PacienteDetalle() {
   const handleSavePatient = async (e: FormEvent) => {
     e.preventDefault();
     if (!paciente) return;
+    const phoneErr = validatePhonePeru(editForm.telefono_principal);
+    if (phoneErr) {
+      showToast(phoneErr, 'error');
+      return;
+    }
     setIsSavingPatient(true);
     try {
       const payload: PacienteUpdatePayload = {
@@ -434,7 +321,7 @@ export default function PacienteDetalle() {
   const handleOpenCreateCita = () => {
     const now = new Date();
     setCitaForm({
-      fecha: now.toISOString().split('T')[0],
+      fecha: formatLocalDate(now),
       hora: `${String(now.getHours() + 1).padStart(2, '0')}:00`,
       medico_id: '', duracion_minutos: 30, notas: '',
     });
@@ -740,8 +627,8 @@ export default function PacienteDetalle() {
               </svg>
               <h3 className="text-sm font-bold text-gray-800">Historial de Citas</h3>
             </div>
-            {/* Nueva cita: solo secretaria */}
-            {!isDoctor && (
+            {/* Nueva cita: solo secretaria y paciente activa */}
+            {!isDoctor && paciente.activo && (
               <button onClick={handleOpenCreateCita}
                 className="flex items-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-all"
                 style={{ backgroundColor: PRIMARY }}>
@@ -767,7 +654,7 @@ export default function PacienteDetalle() {
                 </svg>
               </div>
               <p className="text-sm text-gray-500 font-medium">Sin citas registradas</p>
-              {!isDoctor && (
+              {!isDoctor && paciente.activo && (
                 <button onClick={handleOpenCreateCita}
                   className="text-xs font-bold py-2 px-4 rounded-lg text-white hover:opacity-90"
                   style={{ backgroundColor: PRIMARY }}>
@@ -869,7 +756,7 @@ export default function PacienteDetalle() {
       {/* Editar paciente (secretaria) */}
       {showEditPatient && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
-             onClick={() => setShowEditPatient(false)}>
+             {...editPatientBackdrop}>
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
                onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -929,8 +816,10 @@ export default function PacienteDetalle() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Teléfono principal</label>
                   <input name="telefono_principal" value={editForm.telefono_principal}
-                    onChange={e => setEditForm(prev => ({ ...prev, telefono_principal: e.target.value }))}
-                    placeholder="999 000 000"
+                    onChange={e => setEditForm(prev => ({ ...prev, telefono_principal: sanitizeDigits(e.target.value, 9) }))}
+                    placeholder="9XXXXXXXX"
+                    inputMode="numeric"
+                    maxLength={9}
                     className="w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all"
                     style={{ borderColor: '#E8D5EF' }}
                     onFocus={e => e.currentTarget.style.borderColor = PRIMARY}
@@ -965,7 +854,7 @@ export default function PacienteDetalle() {
 
       {/* Cita Create/Edit (secretaria) */}
       {!isDoctor && (citaModal === 'create' || citaModal === 'edit') && (
-        <CitaModal
+        <PacienteCitaModal
           mode={citaModal}
           form={citaForm}
           pacienteNombre={`${paciente.nombre} ${paciente.apellidos}`}
@@ -980,40 +869,25 @@ export default function PacienteDetalle() {
                 })()
               : null
           }
+          medicoIdForDisponibilidad={
+            isSecretary && citaModal === 'create'
+              ? paciente.medico_asignado_id ?? null
+              : citaForm.medico_id
+                ? Number(citaForm.medico_id)
+                : null
+          }
+          excluirCitaId={citaModal === 'edit' ? selectedCita?.id : undefined}
           onClose={() => setCitaModal(null)}
           onSubmit={citaModal === 'create' ? handleCreateCita : handleEditCita}
           onChange={e => setCitaForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
+          onMedicoChange={medicoId => setCitaForm(prev => ({ ...prev, medico_id: medicoId }))}
           onDuracionChange={v => setCitaForm(prev => ({ ...prev, duracion_minutos: v }))}
+          onSelectHora={hora => setCitaForm(prev => ({ ...prev, hora }))}
         />
       )}
 
-      {/* Cita Delete (secretaria) */}
       {!isDoctor && citaModal === 'delete' && selectedCita && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-             onClick={() => setCitaModal(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4"
-               onClick={e => e.stopPropagation()}>
-            <div className="w-14 h-14 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mx-auto">
-              <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-extrabold text-gray-900">¿Cancelar esta cita?</h3>
-              <p className="text-sm text-gray-500 mt-2">Esta acción marcará la cita como <strong>"cancelada"</strong>.</p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setCitaModal(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">
-                Volver
-              </button>
-              <button onClick={handleDeleteCita} disabled={isSavingCita}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50">
-                {isSavingCita ? 'Cancelando...' : 'Confirmar'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteCitaModal onClose={() => setCitaModal(null)} onConfirm={handleDeleteCita} />
       )}
 
       {/* ── EXPEDIENTE INTELIGENTE ─────────────────────────────────────────── */}

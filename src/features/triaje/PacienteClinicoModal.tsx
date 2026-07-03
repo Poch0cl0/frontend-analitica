@@ -1,5 +1,6 @@
 import type { DcAtenderForm } from '../../components/DatosClinicosAtenderForm';
 import { DcAtenderReadonlyView } from '../../components/DatosClinicosAtenderForm';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 interface PacienteClinicoModalProps {
   pacienteNombre: string;
@@ -16,9 +17,11 @@ export default function PacienteClinicoModal({
   isLoading,
   onClose,
 }: PacienteClinicoModalProps) {
+  const backdrop = useModalBackdrop(onClose);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs" {...backdrop}>
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-gray-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: '#612853' }}>
           <div className="text-white">
             <h3 className="font-extrabold text-lg">Datos Clínicos del Paciente</h3>

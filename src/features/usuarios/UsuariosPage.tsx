@@ -6,8 +6,12 @@ import {
   createUsuario,
   updateUsuario,
   desactivarUsuario,
+  getCurrentUser,
 } from '../../services/api';
 import type { RolResponse, UsuarioResponse } from '../../services/api';
+import UserModal, { emptyUserForm, type UserForm } from './components/UserModal';
+import HorarioMedicoModal from './components/HorarioMedicoModal';
+import { useModalBackdrop } from '../../hooks/useModalBackdrop';
 
 const PRIMARY = '#612853';
 
@@ -19,6 +23,34 @@ const ROL_LABELS: Record<string, string> = {
 
 function rolLabel(nombre: string): string {
   return ROL_LABELS[nombre] ?? nombre;
+}
+
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (first?.msg) return first.msg;
+  }
+  return fallback;
+}
+
+function normalizeUsername(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function validateUsername(value: string, usuarios: UsuarioResponse[], excludeId?: number): string | null {
+  const username = normalizeUsername(value);
+  if (!username) return 'Ingrese un nombre de usuario';
+  if (username.length < 3) return 'El usuario debe tener al menos 3 caracteres';
+  if (!/^[a-z0-9._-]+$/.test(username)) {
+    return 'Solo letras minúsculas, números, punto, guion o guion bajo';
+  }
+  const exists = usuarios.some(
+    u => u.id !== excludeId && u.username.toLowerCase() === username,
+  );
+  if (exists) return 'Ese nombre de usuario ya está en uso';
+  return null;
 }
 
 function formatDate(iso: string): string {
@@ -33,180 +65,6 @@ function getInitials(nombre: string, apellidos: string): string {
   return `${nombre.charAt(0)}${apellidos.charAt(0)}`.toUpperCase();
 }
 
-interface UserForm {
-  email: string;
-  password: string;
-  nombre: string;
-  apellidos: string;
-  rol_id: string;
-}
-
-const emptyForm: UserForm = {
-  email: '',
-  password: '',
-  nombre: '',
-  apellidos: '',
-  rol_id: '',
-};
-
-interface UserModalProps {
-  mode: 'create' | 'edit';
-  form: UserForm;
-  roles: RolResponse[];
-  isSaving: boolean;
-  onClose: () => void;
-  onSubmit: (e: FormEvent) => void;
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-}
-
-function UserModal({ mode, form, roles, isSaving, onClose, onSubmit, onChange }: UserModalProps) {
-  const inputCls =
-    'w-full text-sm px-3 py-2.5 rounded-lg border focus:outline-none transition-all bg-white';
-  const borderNormal = '#E8D5EF';
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl w-full max-w-md shadow-2xl my-6 flex flex-col max-h-[calc(100vh-3rem)]"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: '#F5EDF2' }}
-            >
-              <svg
-                className="w-5 h-5"
-                style={{ color: PRIMARY }}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-base font-bold text-gray-900">
-              {mode === 'create' ? 'Nuevo usuario' : 'Editar usuario'}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <form onSubmit={onSubmit} className="p-6 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Nombres *</label>
-              <input
-                name="nombre"
-                required
-                value={form.nombre}
-                onChange={onChange}
-                className={inputCls}
-                style={{ borderColor: borderNormal }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Apellidos *</label>
-              <input
-                name="apellidos"
-                required
-                value={form.apellidos}
-                onChange={onChange}
-                className={inputCls}
-                style={{ borderColor: borderNormal }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Correo electrónico *</label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={form.email}
-              onChange={onChange}
-              className={inputCls}
-              style={{ borderColor: borderNormal }}
-            />
-          </div>
-
-          {mode === 'create' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Contraseña *</label>
-              <input
-                type="password"
-                name="password"
-                required
-                minLength={6}
-                value={form.password}
-                onChange={onChange}
-                placeholder="Mínimo 6 caracteres"
-                className={inputCls}
-                style={{ borderColor: borderNormal }}
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Rol *</label>
-            <select
-              name="rol_id"
-              required
-              value={form.rol_id}
-              onChange={onChange}
-              className={inputCls}
-              style={{ borderColor: borderNormal }}
-            >
-              <option value="">Seleccionar rol</option>
-              {roles.map(r => (
-                <option key={r.id} value={r.id}>
-                  {rolLabel(r.nombre)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 text-gray-700 hover:bg-gray-50"
-              style={{ borderColor: borderNormal }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-50 shadow-sm"
-              style={{ backgroundColor: PRIMARY }}
-            >
-              {isSaving ? 'Guardando...' : mode === 'create' ? 'Crear usuario' : 'Guardar cambios'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<UsuarioResponse[]>([]);
   const [roles, setRoles] = useState<RolResponse[]>([]);
@@ -215,11 +73,20 @@ export default function UsuariosPage() {
   const [filtroRol, setFiltroRol] = useState<string>('todos');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'activos' | 'inactivos'>('activos');
 
-  const [modal, setModal] = useState<'create' | 'edit' | null>(null);
+  const [modal, setModal] = useState<'create' | 'edit' | 'horario' | 'deactivate' | null>(null);
+  const [horarioUser, setHorarioUser] = useState<UsuarioResponse | null>(null);
+  const [deactivateUser, setDeactivateUser] = useState<UsuarioResponse | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState<UserForm>(emptyForm);
+  const [form, setForm] = useState<UserForm>(emptyUserForm);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState(
+    () => Number(localStorage.getItem('user_id') || 0),
+  );
+  const deactivateBackdrop = useModalBackdrop(() => {
+    setModal(prev => (prev === 'deactivate' ? null : prev));
+    setDeactivateUser(null);
+  });
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setToast({ msg, type });
@@ -241,6 +108,12 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     loadData();
+    getCurrentUser()
+      .then(me => {
+        setCurrentUserId(me.id);
+        localStorage.setItem('user_id', String(me.id));
+      })
+      .catch(() => { /* ignore */ });
   }, [loadData]);
 
   const filtrados = useMemo(() => {
@@ -250,7 +123,7 @@ export default function UsuariosPage() {
       if (filtroEstado === 'inactivos' && u.activo) return false;
       if (filtroRol !== 'todos' && u.rol.nombre !== filtroRol) return false;
       if (!q) return true;
-      const full = `${u.nombre} ${u.apellidos} ${u.email}`.toLowerCase();
+      const full = `${u.nombre} ${u.apellidos} ${u.username} ${u.email}`.toLowerCase();
       return full.includes(q);
     });
   }, [usuarios, busqueda, filtroRol, filtroEstado]);
@@ -269,7 +142,7 @@ export default function UsuariosPage() {
   const handleOpenCreate = () => {
     const defaultRol = roles.find(r => r.nombre === 'medico') ?? roles[0];
     setForm({
-      ...emptyForm,
+      ...emptyUserForm,
       rol_id: defaultRol ? String(defaultRol.id) : '',
     });
     setEditId(null);
@@ -278,6 +151,7 @@ export default function UsuariosPage() {
 
   const handleOpenEdit = (u: UsuarioResponse) => {
     setForm({
+      username: u.username,
       email: u.email,
       password: '',
       nombre: u.nombre,
@@ -290,10 +164,20 @@ export default function UsuariosPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const usernameErr = validateUsername(
+      form.username,
+      usuarios,
+      modal === 'edit' ? editId ?? undefined : undefined,
+    );
+    if (usernameErr) {
+      showToast(usernameErr, 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       if (modal === 'create') {
         await createUsuario({
+          username: normalizeUsername(form.username),
           email: form.email.trim(),
           password: form.password,
           nombre: form.nombre.trim(),
@@ -303,41 +187,65 @@ export default function UsuariosPage() {
         showToast('Usuario creado correctamente', 'success');
       } else if (editId) {
         await updateUsuario(editId, {
+          username: normalizeUsername(form.username),
           email: form.email.trim(),
           nombre: form.nombre.trim(),
           apellidos: form.apellidos.trim(),
-          rol_id: Number(form.rol_id),
         });
         showToast('Usuario actualizado', 'success');
       }
       setModal(null);
       await loadData();
     } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      showToast(typeof detail === 'string' ? detail : 'Error al guardar usuario', 'error');
+      showToast(apiErrorMessage(err, 'Error al guardar usuario'), 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDesactivar = async (u: UsuarioResponse) => {
-    if (!window.confirm(`¿Desactivar a ${u.nombre} ${u.apellidos}?`)) return;
+  const handleOpenDeactivate = (u: UsuarioResponse) => {
+    if (u.id === currentUserId) {
+      showToast('No puede desactivar su propia cuenta', 'error');
+      return;
+    }
+    setDeactivateUser(u);
+    setModal('deactivate');
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateUser) return;
+    setIsSaving(true);
     try {
-      await desactivarUsuario(u.id);
-      showToast('Usuario desactivado', 'success');
-      await loadData();
-    } catch {
-      showToast('No se pudo desactivar el usuario', 'error');
+      const { usuario: updated, citas_canceladas } = await desactivarUsuario(deactivateUser.id);
+      setUsuarios(prev => prev.map(x => (x.id === updated.id ? updated : x)));
+      setModal(null);
+      setDeactivateUser(null);
+      const citasMsg = citas_canceladas > 0
+        ? ` Se cancelaron ${citas_canceladas} cita(s) futura(s).`
+        : '';
+      showToast(
+        `${updated.nombre} ${updated.apellidos} fue desactivado.${citasMsg} Use el filtro "Solo inactivos" para verlo.`,
+        'success',
+      );
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : 'No se pudo desactivar el usuario', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleReactivar = async (u: UsuarioResponse) => {
+    setIsSaving(true);
     try {
-      await updateUsuario(u.id, { activo: true });
+      const updated = await updateUsuario(u.id, { activo: true });
+      setUsuarios(prev => prev.map(x => (x.id === updated.id ? updated : x)));
       showToast('Usuario reactivado', 'success');
-      await loadData();
-    } catch {
-      showToast('No se pudo reactivar el usuario', 'error');
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : 'No se pudo reactivar el usuario', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -459,7 +367,7 @@ export default function UsuariosPage() {
                           <p className="text-sm font-bold text-gray-900">
                             {u.nombre} {u.apellidos}
                           </p>
-                          <p className="text-[10px] text-gray-400 font-mono">ID #{u.id}</p>
+                          <p className="text-[10px] text-gray-500 font-mono">@{u.username}</p>
                         </div>
                       </div>
                     </td>
@@ -483,6 +391,17 @@ export default function UsuariosPage() {
                     <td className="py-4 px-4 text-sm text-gray-500">{formatDate(u.created_at)}</td>
                     <td className="py-4 px-5">
                       <div className="flex items-center justify-end gap-2">
+                        {u.rol.nombre === 'medico' && (
+                          <button
+                            onClick={() => { setHorarioUser(u); setModal('horario'); }}
+                            className="p-2 rounded-lg text-fuchsia-700 hover:bg-fuchsia-50"
+                            title="Horario de atención"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenEdit(u)}
                           className="p-2 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100"
@@ -494,9 +413,10 @@ export default function UsuariosPage() {
                         </button>
                         {u.activo ? (
                           <button
-                            onClick={() => handleDesactivar(u)}
-                            className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50"
-                            title="Desactivar usuario"
+                            onClick={() => handleOpenDeactivate(u)}
+                            disabled={u.id === currentUserId || isSaving}
+                            className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={u.id === currentUserId ? 'No puede desactivar su propia cuenta' : 'Desactivar usuario'}
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
@@ -505,7 +425,8 @@ export default function UsuariosPage() {
                         ) : (
                           <button
                             onClick={() => handleReactivar(u)}
-                            className="p-2 rounded-lg text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50"
+                            disabled={isSaving}
+                            className="p-2 rounded-lg text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
                             title="Reactivar usuario"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -523,11 +444,64 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {modal && (
+      {modal === 'horario' && horarioUser && (
+        <HorarioMedicoModal
+          medicoId={horarioUser.id}
+          medicoNombre={`${horarioUser.nombre} ${horarioUser.apellidos}`}
+          onClose={() => { setModal(null); setHorarioUser(null); }}
+        />
+      )}
+
+      {modal === 'deactivate' && deactivateUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" {...deactivateBackdrop}>
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl p-8 space-y-5" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="text-center space-y-3">
+              <h3 className="text-xl font-extrabold text-gray-900">¿Desactivar usuario?</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                <strong>{deactivateUser.nombre} {deactivateUser.apellidos}</strong> no podrá iniciar sesión.
+                <strong> No se borra su historial</strong>; puede reactivarse desde este listado.
+              </p>
+              {deactivateUser.rol?.nombre === 'medico' && (
+                <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-left text-sm text-red-800">
+                  <p className="font-semibold">Médico: citas futuras</p>
+                  <p className="text-xs mt-1 text-red-700">
+                    Al confirmar, se cancelarán automáticamente las citas programadas o en atención con fecha futura.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setModal(null); setDeactivateUser(null); }}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeactivate}
+                disabled={isSaving}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >
+                {isSaving ? 'Desactivando...' : 'Confirmar desactivación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal && modal !== 'horario' && modal !== 'deactivate' && (
         <UserModal
           mode={modal}
           form={form}
           roles={roles}
+          rolNombre={editId ? usuarios.find(u => u.id === editId)?.rol.nombre : undefined}
           isSaving={isSaving}
           onClose={() => setModal(null)}
           onSubmit={handleSubmit}

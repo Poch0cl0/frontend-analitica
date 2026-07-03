@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getTriajePriorizados, sincronizarTriaje, exportarReportePaciente, enviarReportePaciente } from '../../services/api';
 import type { TriajePriorizadoItem, TriajeAlgoritmo } from '../../services/api';
 import PacienteClinicoModal from './PacienteClinicoModal';
+import TriajePatientCard from './components/TriajePatientCard';
 import { loadAtenderFormForPaciente } from '../../utils/atenderFormLoader';
 import type { DcAtenderForm } from '../../components/DatosClinicosAtenderForm';
 
@@ -27,29 +28,6 @@ const ALGORITMOS: { key: TriajeAlgoritmo; label: string }[] = [
 function getNivelConfig(nivel: string) {
   const n = nivel?.toLowerCase();
   return NIVELES.find(l => l.key === n) || NIVELES[3];
-}
-
-function getScore(p: TriajePriorizadoItem): number {
-  if (p.score_formula_ponderada != null) {
-    return Math.round(Number(p.score_formula_ponderada) * 100);
-  }
-  if (p.prob_consenso != null) {
-    return Math.round(Number(p.prob_consenso) * 100);
-  }
-  return 0;
-}
-
-function buildTags(p: TriajePriorizadoItem): string[] {
-  const tags: string[] = [];
-  if (p.edad_gestacional_semanas) tags.push(`${p.edad_gestacional_semanas} semanas de gestación`);
-  if (p.bmi != null) tags.push(`IMC ${Number(p.bmi).toFixed(1)}`);
-  if (p.num_condiciones_cronicas && p.num_condiciones_cronicas > 0) {
-    tags.push(`${p.num_condiciones_cronicas} condición(es) crónica(s)`);
-  }
-  if (p.prob_consenso != null) {
-    tags.push(`Riesgo prematuro ${Math.round(Number(p.prob_consenso) * 100)}%`);
-  }
-  return tags;
 }
 
 export default function TriajePage() {
@@ -315,110 +293,17 @@ export default function TriajePage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filtrados.map(p => {
-            const score = getScore(p);
-            const tags = buildTags(p);
-            const cfg = getNivelConfig(p.nivel_urgencia);
-            const acciones = p.acciones_urgentes || [];
-
-            return (
-              <div key={p.paciente_id}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row">
-
-                {/* Score lateral */}
-                <div className="md:w-36 flex-shrink-0 flex flex-col items-center justify-center p-5 border-b md:border-b-0 md:border-r border-gray-100"
-                  style={{ backgroundColor: cfg.bg }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: cfg.color }}>
-                    {p.nivel_urgencia?.toUpperCase()}
-                  </span>
-                  <span className="text-4xl font-black" style={{ color: cfg.color }}>{score}</span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">SCORE</span>
-                </div>
-
-                {/* Info central */}
-                <div className="flex-1 p-5 space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-lg font-extrabold text-gray-900">
-                        {p.nombre} {p.apellidos}
-                      </h3>
-                      <p className="text-xs text-gray-500 font-medium">
-                        DNI {p.dni}
-                        {p.edad_gestacional_semanas ? ` · ${p.edad_gestacional_semanas} semanas de gestación` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                        style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}>
-                        {p.nivel_urgencia?.toUpperCase()} PRIORIDAD
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono">ID: #{p.paciente_id}</span>
-                    </div>
-                  </div>
-
-                  {/* Tags médicos */}
-                  {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {tags.map(tag => (
-                        <span key={tag} className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-gray-600">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Recomendaciones */}
-                  {acciones.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Recomendaciones</p>
-                      <div className="flex flex-wrap gap-2">
-                        {acciones.map(acc => (
-                          <span key={acc} className="flex items-center gap-1 text-xs font-semibold text-gray-700 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
-                            <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                            {acc}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Acciones */}
-                <div className="flex md:flex-col items-center justify-center gap-2 p-4 border-t md:border-t-0 md:border-l border-gray-100 flex-shrink-0">
-                  <button
-                    onClick={() => navigate(`/recomendaciones/${p.paciente_id}`)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 shadow-sm"
-                    style={{ backgroundColor: cfg.color }}
-                  >
-                    Ver recomendaciones
-                  </button>
-                  <button
-                    onClick={() => handleVerClinicos(p)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50"
-                  >
-                    Ver
-                  </button>
-                  <button
-                    onClick={() => handleDownloadReport(p.paciente_id, p.dni)}
-                    disabled={reportLoadingId === p.paciente_id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 print:hidden"
-                  >
-                    PDF
-                  </button>
-                  <button
-                    onClick={() => handleSendReport(p.paciente_id)}
-                    disabled={reportLoadingId === p.paciente_id}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 print:hidden"
-                    style={{ backgroundColor: PRIMARY }}
-                  >
-                    Enviar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          {filtrados.map((p) => (
+            <TriajePatientCard
+              key={p.paciente_id}
+              paciente={p}
+              reportLoadingId={reportLoadingId}
+              onVerRecomendaciones={(id) => navigate(`/recomendaciones/${id}`)}
+              onVerClinicos={handleVerClinicos}
+              onDownloadReport={handleDownloadReport}
+              onSendReport={handleSendReport}
+            />
+          ))}
         </div>
       )}
       {clinicoModal && (

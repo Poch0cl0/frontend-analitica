@@ -225,7 +225,20 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
                     <p className="text-[8px] text-slate-400 mt-0.5">IC 95%: {meta.ic95}</p>
                   </div>
                   {prediction?.prediccion_id && (
-                    <ModelFeedback prediccionId={prediction.prediccion_id} modelo={modelKey} />
+                    <>
+                      <ModelFeedback
+                        prediccionId={prediction.prediccion_id}
+                        modelo={modelKey}
+                        aspecto="probabilidad"
+                        pregunta="¿Acertó la probabilidad?"
+                      />
+                      <ModelFeedback
+                        prediccionId={prediction.prediccion_id}
+                        modelo={modelKey}
+                        aspecto="semanas"
+                        pregunta="¿Acertaron las semanas?"
+                      />
+                    </>
                   )}
                 </div>
               );

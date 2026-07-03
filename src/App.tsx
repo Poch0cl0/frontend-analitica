@@ -8,14 +8,16 @@ import PacientesPage from './features/pacientes/PacientesPage';
 import PacienteDetalle from './features/pacientes/PacienteDetalle';
 import TriajePage from './features/triaje/TriajePage';
 import { NavProvider } from './contexts/NavContext';
-import { RecommendationsList } from './features/recomendations/RecomendationsList';
+import { RecommendationsList } from './features/recomendaciones/RecommendationsList';
 import FeedbackAnalytics from './features/feedback/FeedbackAnalytics';
 import UsuariosPage from './features/usuarios/UsuariosPage';
+import RecomendacionesPacientePage from './features/recomendaciones/RecomendacionesPacientePage';
+import { roleAllowed } from './utils/role';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
 const ADMIN_ROLES = ['administrador'];
 
-const UnderConstruction = ({ title }: { title: string }) => (
+const _UnderConstruction = ({ title }: { title: string }) => (
   <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50">
     <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-6 border border-amber-200">
       <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -38,9 +40,9 @@ const UnderConstruction = ({ title }: { title: string }) => (
 
 function ProtectedRoute({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const token = localStorage.getItem('access_token');
-  const role = localStorage.getItem('user_role') || 'medico';
+  const role = localStorage.getItem('user_role');
   if (!token) return <Navigate to="/" replace />;
-  if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to="/dashboard" replace />;
+  if (allowedRoles && !roleAllowed(role, allowedRoles)) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -87,6 +89,12 @@ function App() {
             <Route path="/recomendaciones" element={
               <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
                 <SidebarLayout><RecommendationsList/></SidebarLayout>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/recomendaciones/:pacienteId" element={
+              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+                <SidebarLayout><RecomendacionesPacientePage /></SidebarLayout>
               </ProtectedRoute>
             } />
 
