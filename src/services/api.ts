@@ -986,6 +986,15 @@ export interface FeedbackPorAspecto {
   precision: number;
 }
 
+export interface FeedbackPorModeloAspecto {
+  modelo: string | null;
+  aspecto: string;
+  total: number;
+  correctos: number;
+  incorrectos: number;
+  precision: number;
+}
+
 export interface FeedbackEstadisticasResponse {
   total_votos: number;
   total_correctos: number;
@@ -993,20 +1002,25 @@ export interface FeedbackEstadisticasResponse {
   precision_global: number;
   por_modelo: FeedbackPorModelo[];
   por_aspecto: FeedbackPorAspecto[];
+  por_modelo_aspecto: FeedbackPorModeloAspecto[];
   temporal: FeedbackTemporal[];
   alcance: string;
   medico_id: number | null;
 }
 
+export type FeedbackModeloFiltro = 'random_forest' | 'catboost' | 'svm' | 'consenso';
+
 export const getFeedbackEstadisticas = async (params?: {
   alcance?: 'global' | 'propio';
   medicoId?: number;
   aspecto?: 'probabilidad' | 'semanas';
+  modelo?: FeedbackModeloFiltro;
 }): Promise<FeedbackEstadisticasResponse> => {
   const query: Record<string, string | number> = {};
   if (params?.alcance) query.alcance = params.alcance;
   if (params?.medicoId) query.medico_id = params.medicoId;
   if (params?.aspecto) query.aspecto = params.aspecto;
+  if (params?.modelo) query.modelo = params.modelo;
   const response = await api.get<FeedbackEstadisticasResponse>('/api/prediccion/feedback/estadisticas', { params: query });
   return response.data;
 };

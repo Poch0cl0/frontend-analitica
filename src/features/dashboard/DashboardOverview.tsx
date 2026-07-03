@@ -40,6 +40,7 @@ import { useCitaActions } from '../../hooks/useCitaActions';
 import AdminAnalyticsPanel from './AdminAnalyticsPanel';
 import OperativoDashboardPanel from './OperativoDashboardPanel';
 import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
+import FeedbackDashboardSummary from './FeedbackDashboardSummary';
 
 // ==================== TIPOS ADICIONALES ====================
 
@@ -710,6 +711,8 @@ export default function DashboardOverview() {
         )}
 
       </div>
+
+      {(isDoctor || isAdmin) && <FeedbackDashboardSummary />}
 
       <OperativoDashboardPanel />
 

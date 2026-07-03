@@ -6,6 +6,8 @@ import {
 import { getFeedbackEstadisticas, getMedicos, type FeedbackEstadisticasResponse, type MedicoResumen } from '../../services/api';
 import { ThumbsUp, ThumbsDown, BarChart3, TrendingUp } from 'lucide-react';
 import { useUserRole } from '../../hooks/useUserRole';
+import { aspectoFeedbackLabel, FEEDBACK_ASPECTO_OPTIONS, FEEDBACK_MODELO_OPTIONS, modeloFeedbackLabel } from './feedbackLabels';
+import type { FeedbackModeloFiltro } from '../../services/api';
 
 const CHART_COLOR = '#612853';
 
@@ -15,6 +17,7 @@ export default function FeedbackAnalytics() {
   const [loading, setLoading] = useState(true);
   const [alcance, setAlcance] = useState<'global' | 'propio'>('global');
   const [aspecto, setAspecto] = useState<'' | 'probabilidad' | 'semanas'>('');
+  const [modelo, setModelo] = useState<'' | FeedbackModeloFiltro>('');
   const [medicoId, setMedicoId] = useState('');
   const [medicos, setMedicos] = useState<MedicoResumen[]>([]);
 
@@ -29,6 +32,7 @@ export default function FeedbackAnalytics() {
         alcance: isDoctor ? alcance : 'global',
         medicoId: isAdmin && medicoId ? Number(medicoId) : undefined,
         aspecto: aspecto || undefined,
+        modelo: modelo || undefined,
       });
       setData(res);
     } catch {
@@ -36,7 +40,7 @@ export default function FeedbackAnalytics() {
     } finally {
       setLoading(false);
     }
-  }, [alcance, aspecto, medicoId, isAdmin, isDoctor]);
+  }, [alcance, aspecto, modelo, medicoId, isAdmin, isDoctor]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -59,11 +63,13 @@ export default function FeedbackAnalytics() {
   }
 
   const modeloData = data.por_modelo.map((m) => ({
-    name: m.modelo ?? 'Consenso',
+    name: modeloFeedbackLabel(m.modelo),
     Correctos: m.correctos,
     Incorrectos: m.incorrectos,
     precision: +(m.precision * 100).toFixed(1),
   }));
+
+  const detalleFilas = data.por_modelo_aspecto ?? [];
 
   const aspectoData = (data.por_aspecto ?? []).map((a) => ({
     name: a.aspecto === 'probabilidad' ? 'Probabilidad' : 'Semanas',
@@ -117,9 +123,15 @@ export default function FeedbackAnalytics() {
           )}
           <select value={aspecto} onChange={(e) => setAspecto(e.target.value as typeof aspecto)}
             className="text-xs px-3 py-2 border rounded-lg">
-            <option value="">Probabilidad y semanas</option>
-            <option value="probabilidad">Solo probabilidad</option>
-            <option value="semanas">Solo semanas</option>
+            {FEEDBACK_ASPECTO_OPTIONS.map((o) => (
+              <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select value={modelo} onChange={(e) => setModelo(e.target.value as typeof modelo)}
+            className="text-xs px-3 py-2 border rounded-lg">
+            {FEEDBACK_MODELO_OPTIONS.map((o) => (
+              <option key={o.value || 'all'} value={o.value}>{o.label}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -158,8 +170,41 @@ export default function FeedbackAnalytics() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {detalleFilas.length > 0 && (
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm lg:col-span-2">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Detalle por modelo y aspecto</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Probabilidad y semanas por modelo (RF, CatBoost, SVM) y por consenso, cada uno por separado.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-[10px] uppercase text-gray-400 border-b border-gray-100">
+                    <th className="py-2 pr-4 font-bold">Modelo</th>
+                    <th className="py-2 pr-4 font-bold">Aspecto</th>
+                    <th className="py-2 pr-4 font-bold text-right">Sí / total</th>
+                    <th className="py-2 font-bold text-right">Precisión</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {detalleFilas.map((f) => (
+                    <tr key={`${f.modelo ?? 'consenso'}-${f.aspecto}`}>
+                      <td className="py-2.5 pr-4 font-semibold text-gray-800">{modeloFeedbackLabel(f.modelo)}</td>
+                      <td className="py-2.5 pr-4 text-gray-600">{aspectoFeedbackLabel(f.aspecto)}</td>
+                      <td className="py-2.5 pr-4 text-right text-gray-600">{f.correctos}/{f.total}</td>
+                      <td className="py-2.5 text-right font-bold" style={{ color: CHART_COLOR }}>
+                        {(f.precision * 100).toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-          <h3 className="text-sm font-bold text-gray-700 mb-4">Por modelo (RF, CatBoost, SVM, consenso)</h3>
+          <h3 className="text-sm font-bold text-gray-700 mb-4">Por modelo (todos los aspectos)</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={modeloData}>
               <CartesianGrid strokeDasharray="3 3" />

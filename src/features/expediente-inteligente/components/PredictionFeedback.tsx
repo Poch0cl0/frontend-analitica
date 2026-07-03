@@ -2,16 +2,15 @@ import ModelFeedback from './ModelFeedback';
 
 interface PredictionFeedbackProps {
   prediccionId: number;
-  pacienteNombre: string;
 }
 
-export default function PredictionFeedback({ prediccionId, pacienteNombre }: PredictionFeedbackProps) {
+export default function PredictionFeedback({ prediccionId }: PredictionFeedbackProps) {
   return (
     <div className="bg-white rounded-xl border border-fuchsia-100 shadow-sm p-4 space-y-3">
       <div>
         <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Calificación del consenso</span>
         <p className="text-xs text-gray-500 mt-1">
-          Como médico de {pacienteNombre}, indique si está de acuerdo con cada aspecto de la predicción.
+          Califique por separado la probabilidad y las semanas del resultado de consenso (además de cada modelo arriba).
         </p>
       </div>
       <ModelFeedback

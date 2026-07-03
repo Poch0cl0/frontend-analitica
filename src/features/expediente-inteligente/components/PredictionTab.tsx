@@ -245,13 +245,13 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
                         prediccionId={prediction.prediccion_id}
                         modelo={modelKey}
                         aspecto="probabilidad"
-                        pregunta="¿Acertó la probabilidad?"
+                        pregunta="¿Acertó la probabilidad de este modelo?"
                       />
                       <ModelFeedback
                         prediccionId={prediction.prediccion_id}
                         modelo={modelKey}
                         aspecto="semanas"
-                        pregunta="¿Acertaron las semanas?"
+                        pregunta="¿Acertaron las semanas de este modelo?"
                       />
                     </>
                   )}
@@ -296,10 +296,7 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
       )}
 
       {prediction?.prediccion_id && (
-        <PredictionFeedback
-          prediccionId={prediction.prediccion_id}
-          pacienteNombre={profile ? `${profile.nombre} ${profile.apellidos}` : ''}
-        />
+        <PredictionFeedback prediccionId={prediction.prediccion_id} />
       )}
 
       {emailMsg && (
