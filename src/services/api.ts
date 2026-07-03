@@ -1025,6 +1025,91 @@ export const getFeedbackEstadisticas = async (params?: {
   return response.data;
 };
 
+// ==================== DICTAMEN MÉDICO / COMPARATIVA ====================
+
+export interface PrediccionDictamenResponse {
+  id: number;
+  prediccion_id: number;
+  medico_id: number;
+  prob_medico: number;
+  semanas_medico: number;
+  prob_real: number | null;
+  semanas_real: number | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+  prob_consenso: number | null;
+  semanas_consenso: number | null;
+  diff_prob_consenso: number | null;
+  diff_semanas_consenso: number | null;
+}
+
+export interface PrediccionDictamenInput {
+  prob_medico: number;
+  semanas_medico: number;
+  prob_real?: number | null;
+  semanas_real?: number | null;
+  notas?: string;
+}
+
+export const getPrediccionDictamen = async (prediccionId: number): Promise<PrediccionDictamenResponse | null> => {
+  try {
+    const response = await api.get<PrediccionDictamenResponse>(`/api/prediccion/${prediccionId}/dictamen`);
+    return response.data;
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404) return null;
+    throw err;
+  }
+};
+
+export const guardarPrediccionDictamen = async (
+  prediccionId: number,
+  data: PrediccionDictamenInput,
+): Promise<PrediccionDictamenResponse> => {
+  const response = await api.post<PrediccionDictamenResponse>(`/api/prediccion/${prediccionId}/dictamen`, data);
+  return response.data;
+};
+
+export interface ComparativaTemporalItem {
+  fecha: string;
+  n: number;
+  promedio_modelo: number;
+  promedio_medico: number;
+  promedio_real: number | null;
+  diff_modelo_medico: number;
+}
+
+export interface ComparativaEstadisticasResponse {
+  aspecto: string;
+  modelo: string;
+  total_registros: number;
+  diff_promedio_modelo_medico: number;
+  diff_promedio_medico_real: number | null;
+  diff_promedio_modelo_real: number | null;
+  promedio_modelo: number;
+  promedio_medico: number;
+  promedio_real: number | null;
+  temporal: ComparativaTemporalItem[];
+  alcance: string;
+  medico_id: number | null;
+}
+
+export const getComparativaEstadisticas = async (params?: {
+  alcance?: 'global' | 'propio';
+  medicoId?: number;
+  aspecto?: 'probabilidad' | 'semanas';
+  modelo?: FeedbackModeloFiltro;
+}): Promise<ComparativaEstadisticasResponse> => {
+  const query: Record<string, string | number> = {};
+  if (params?.alcance) query.alcance = params.alcance;
+  if (params?.medicoId) query.medico_id = params.medicoId;
+  if (params?.aspecto) query.aspecto = params.aspecto;
+  if (params?.modelo) query.modelo = params.modelo;
+  const response = await api.get<ComparativaEstadisticasResponse>('/api/prediccion/comparativa/estadisticas', { params: query });
+  return response.data;
+};
+
 // ==================== TRIAJE ====================
 
 export interface TriajeResumen {

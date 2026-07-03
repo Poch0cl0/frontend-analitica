@@ -41,6 +41,7 @@ import AdminAnalyticsPanel from './AdminAnalyticsPanel';
 import OperativoDashboardPanel from './OperativoDashboardPanel';
 import ExpedienteInteligenteModal from '../expediente-inteligente/ExpedienteInteligenteModal';
 import FeedbackDashboardSummary from './FeedbackDashboardSummary';
+import ComparativaDashboardSummary from './ComparativaDashboardSummary';
 
 // ==================== TIPOS ADICIONALES ====================
 
@@ -713,6 +714,8 @@ export default function DashboardOverview() {
       </div>
 
       {(isDoctor || isAdmin) && <FeedbackDashboardSummary />}
+
+      {(isDoctor || isAdmin) && <ComparativaDashboardSummary />}
 
       <OperativoDashboardPanel />
 

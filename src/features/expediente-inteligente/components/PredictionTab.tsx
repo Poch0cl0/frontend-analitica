@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePrediccion } from '../hooks/usePrediccion';
+import MedicoDictamenForm from './MedicoDictamenForm';
 import PredictionFeedback from './PredictionFeedback';
 import ModelFeedback from './ModelFeedback';
 import {
@@ -293,6 +294,20 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
             </div>
           )}
         </div>
+      )}
+
+      {prediction?.prediccion_id && (
+        <MedicoDictamenForm
+          prediccionId={prediction.prediccion_id}
+          probConsenso={prediction.prob_consenso}
+          semanasConsenso={
+            prediction.modelos?.catboost?.semanas_estimadas != null
+              ? Math.round(prediction.modelos.catboost.semanas_estimadas)
+              : prediction.modelos?.random_forest?.semanas_estimadas != null
+                ? Math.round(prediction.modelos.random_forest.semanas_estimadas)
+                : null
+          }
+        />
       )}
 
       {prediction?.prediccion_id && (

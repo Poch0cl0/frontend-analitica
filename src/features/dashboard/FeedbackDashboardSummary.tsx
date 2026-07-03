@@ -171,7 +171,7 @@ export default function FeedbackDashboardSummary() {
       )}
 
       <Link to="/feedback" className="inline-block text-xs font-bold text-fuchsia-900 underline">
-        Ver gráficos y detalle completo →
+        Ver detalle en Rendimiento de Modelos →
       </Link>
     </div>
   );
