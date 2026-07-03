@@ -1,4 +1,5 @@
 import type { TriajePriorizadoItem } from '../../../services/api';
+import { formatDateTime } from '../../../utils/date';
 import { PRIMARY } from '../../../constants/theme';
 import { buildTags, getNivelConfig, getScore } from '../constants/triajeConfig';
 
@@ -36,6 +37,7 @@ export default function TriajePatientCard({
           <div>
             <h3 className="text-lg font-extrabold text-gray-900">{p.nombre} {p.apellidos}</h3>
             <p className="text-xs text-gray-500 font-medium">DNI {p.dni}{p.edad_gestacional_semanas ? ` · ${p.edad_gestacional_semanas} semanas de gestación` : ''}</p>
+            <p className="text-[10px] text-gray-400 mt-1">Triaje: {formatDateTime(p.fecha_triage)}</p>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border" style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}>
             {p.nivel_urgencia?.toUpperCase()} PRIORIDAD

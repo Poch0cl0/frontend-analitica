@@ -3,6 +3,7 @@ import { useTriaje } from '../hooks/useTriaje';
 import { DcAtenderReadonlyView, type DcAtenderForm } from '../../../components/DatosClinicosAtenderForm';
 import { loadAtenderFormForPaciente } from '../../../utils/atenderFormLoader';
 import { exportarReportePaciente, enviarReportePaciente } from '../../../services/api';
+import { formatDateTime } from '../../../utils/date';
 import { X, FileDown, Mail, RefreshCw, Eye } from 'lucide-react';
 
 const NIVELES_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -131,6 +132,9 @@ export default function TriageTab({ pacienteId }: TriageTabProps) {
               <div>
                 <h3 className="text-base font-extrabold text-gray-900">{selectedItem.nombre} {selectedItem.apellidos}</h3>
                 <p className="text-xs text-gray-500">DNI {selectedItem.dni}</p>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Triaje generado: {formatDateTime(selectedItem.fecha_triage)}
+                </p>
               </div>
               <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border" style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}>
                 {cfg.label} PRIORIDAD

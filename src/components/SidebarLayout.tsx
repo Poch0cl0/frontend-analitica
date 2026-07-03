@@ -8,7 +8,7 @@ interface SidebarLayoutProps {
   children: ReactNode;
 }
 
-type IconKey = 'LayoutDashboard' | 'Calendar' | 'Users' | 'HeartPulse' | 'ShieldAlert' | 'BarChart3' | 'TriangleAlert';
+type IconKey = 'LayoutDashboard' | 'Calendar' | 'Users' | 'HeartPulse' | 'ShieldAlert' | 'BarChart3' | 'TriangleAlert' | 'BrainCircuit';
 
 interface MenuItem {
   label: string;
@@ -36,6 +36,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'MÓDULOS CLÍNICOS',
     items: [
+      { label: 'Predicción', path: '/prediccion', icon: 'BrainCircuit', roles: ['medico', 'administrador'] },
       { label: 'Triaje', path: '/triaje', icon: 'TriangleAlert', roles: ['medico', 'administrador'] },
       { label: 'Recomendaciones', path: '/recomendaciones', icon: 'HeartPulse', roles: ['medico', 'administrador'] },
       { label: 'Rendimiento Modelos', path: '/feedback', icon: 'BarChart3', roles: ['medico', 'administrador'] },
@@ -53,6 +54,7 @@ const routeInfo: Record<string, { title: string; section: string }> = {
   '/dashboard': { title: 'Dashboard', section: 'Principal' },
   '/citas': { title: 'Citas', section: 'Principal' },
   '/pacientes': { title: 'Pacientes', section: 'Principal' },
+  '/prediccion': { title: 'Predicción', section: 'Módulos Clínicos' },
   '/triaje': { title: 'Sistema de Priorización por Urgencia', section: 'Módulos Clínicos' },
   '/recomendaciones': { title: 'Recomendaciones', section: 'Módulos Clínicos' },
   '/feedback': { title: 'Rendimiento de Modelos', section: 'Módulos Clínicos' },
@@ -93,6 +95,11 @@ const icons: Record<IconKey, (className?: string) => JSX.Element> = {
   TriangleAlert: (className = 'w-5 h-5') => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  ),
+  BrainCircuit: (className = 'w-5 h-5') => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 2A5.5 5.5 0 004 7.5c0 1.58.67 3 1.75 4.01C4.67 13.5 4 14.92 4 16.5A5.5 5.5 0 009.5 22m5-20A5.5 5.5 0 0120 7.5c0 1.58-.67 3-1.75 4.01C19.33 13.5 20 14.92 20 16.5a5.5 5.5 0 01-5.5 5.5M9.5 7.5h5M12 7.5v9" />
     </svg>
   ),
 };

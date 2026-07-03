@@ -4,12 +4,20 @@ import { useUserRole } from '../../../hooks/useUserRole';
 import MedicoDictamenForm from './MedicoDictamenForm';
 import PredictionFeedback from './PredictionFeedback';
 import ModelFeedback from './ModelFeedback';
+import RiskTrendChart from '../../../components/prediccion/RiskTrendChart';
 import {
   BrainCircuit, Activity, RefreshCw, Printer, Mail,
   AlertTriangle, CheckCircle2, ClipboardList, ChevronDown,
-  TrendingUp, Info, Calendar,
+  Info, Calendar,
 } from 'lucide-react';
-import type { PacientePerfilResponse, PrediccionUltimaResponse, PrediccionHistorialItem } from '../../../services/api';
+import { formatDateTime } from '../../../utils/date';
+import { getApiErrorMessage } from '../../../services/client';
+import {
+  downloadPdfBlob,
+  fetchPrediccionReportPdf,
+  printPdfBlob,
+} from '../../../utils/reportPdf';
+import type { PacientePerfilResponse } from '../../../services/api';
 
 const MODEL_METADATA = {
   random_forest: { ic95: '[78% - 92%]', margen: '+12.4% (Alto)', accuracy: '0.89 (Estable)' },
@@ -64,53 +72,12 @@ function CircularProgress({ percentage, strokeColor, trackColor = '#F1F5F9' }: {
   );
 }
 
-function RiskTrendChart({ historial }: { historial: PrediccionHistorialItem[] }) {
-  const sorted = [...historial].filter(h => h.prob_consenso != null).sort((a, b) => new Date(a.fecha_prediccion).getTime() - new Date(b.fecha_prediccion).getTime());
-  if (sorted.length === 0) {
-    return <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center"><p className="text-sm text-slate-500">Sin historial de predicciones para mostrar tendencia.</p></div>;
-  }
-  const W = 600, H = 200, padL = 48, padR = 16, padT = 20, padB = 40;
-  const chartW = W - padL - padR, chartH = H - padT - padB;
-  const points = sorted.map((h, i) => {
-    const x = padL + (sorted.length === 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW);
-    const y = padT + chartH - (Number(h.prob_consenso) * chartH);
-    return { x, y, h };
-  });
-  const polyline = points.map(p => `${p.x},${p.y}`).join(' ');
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-5 h-5 text-[#612853]" />
-        <h3 className="font-extrabold text-slate-800 text-sm">Tendencia de Riesgo Prematuro</h3>
-        <span className="text-[10px] text-slate-400 font-medium ml-auto">{sorted.length} predicción{sorted.length !== 1 ? 'es' : ''}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-        {[0, 25, 50, 75, 100].map(pct => {
-          const y = padT + chartH - (pct / 100) * chartH;
-          return (
-            <g key={pct}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#F1F5F9" strokeWidth="1" />
-              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#94A3B8" fontWeight="600">{pct}%</text>
-            </g>
-          );
-        })}
-        {points.length >= 2 && <polyline points={polyline} fill="none" stroke="#612853" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
-        {points.map(p => (
-          <g key={p.h.id}>
-            <circle cx={p.x} cy={p.y} r="5" fill={riskColor(p.h.nivel_riesgo)} stroke="white" strokeWidth="2" />
-            <text x={p.x} y={H - 8} textAnchor="middle" fontSize="8" fill="#94A3B8" fontWeight="600">{new Date(p.h.fecha_prediccion).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
 export default function PredictionTab({ pacienteId }: PredictionTabProps) {
   const { isDoctor } = useUserRole();
   const { profile, prediction, historial, loading, calculating, error, sinDatosClinicos, ejecutar } = usePrediccion(pacienteId);
   const [isAccordionOpen, setIsAccordionOpen] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
   const [emailMsg, setEmailMsg] = useState<string | null>(null);
 
   const getClinicalVars = (p: PacientePerfilResponse) => {
@@ -133,9 +100,39 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
 
   const getFormattedDate = () => {
     if (prediction?.fecha_prediccion) {
-      return new Date(prediction.fecha_prediccion).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return formatDateTime(prediction.fecha_prediccion, 'Sin consultas previas');
     }
     return 'Sin consultas previas';
+  };
+
+  const loadReportPdf = async (): Promise<Blob> => {
+    return fetchPrediccionReportPdf(pacienteId);
+  };
+
+  const handlePrint = async () => {
+    setReportLoading(true);
+    setEmailMsg(null);
+    try {
+      const blob = await loadReportPdf();
+      printPdfBlob(blob);
+    } catch (err: unknown) {
+      setEmailMsg(getApiErrorMessage(err, 'No se pudo generar el reporte para imprimir.'));
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setReportLoading(true);
+    setEmailMsg(null);
+    try {
+      const blob = await loadReportPdf();
+      downloadPdfBlob(blob, `prediccion_${pacienteId}.pdf`);
+    } catch (err: unknown) {
+      setEmailMsg(getApiErrorMessage(err, 'No se pudo generar el reporte PDF.'));
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const handleSendEmail = async () => {
@@ -145,8 +142,8 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
     try {
       const res = await enviarReportePaciente(pacienteId, 'prediccion');
       setEmailMsg(res.mensaje);
-    } catch {
-      setEmailMsg('No se pudo enviar el reporte por correo.');
+    } catch (err: unknown) {
+      setEmailMsg(getApiErrorMessage(err, 'No se pudo enviar el reporte por correo.'));
     } finally {
       setSendingEmail(false);
     }
@@ -191,7 +188,7 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Última Consulta</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Último análisis</span>
           <span className="text-xs font-semibold text-gray-700 flex items-center gap-1">
             <RefreshCw className="w-3 h-3 text-gray-400" /> {getFormattedDate()}
           </span>
@@ -263,6 +260,23 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
             })}
           </div>
           {historial.length > 0 && <RiskTrendChart historial={historial} />}
+
+          {historial.length > 1 && (
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Historial de análisis</p>
+              <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                {[...historial]
+                  .filter((h) => h.prob_consenso != null)
+                  .sort((a, b) => new Date(b.fecha_prediccion).getTime() - new Date(a.fecha_prediccion).getTime())
+                  .map((h) => (
+                    <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-700 border-b border-gray-50 pb-1.5 last:border-0">
+                      <span className="text-gray-500">{formatDateTime(h.fecha_prediccion)}</span>
+                      <span className="font-bold text-[#612853]">{Math.round(Number(h.prob_consenso) * 100)}% riesgo</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -323,8 +337,13 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
       )}
 
       <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-gray-100">
-        <button onClick={() => window.print()} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-          <Printer className="w-4 h-4" /> Imprimir
+        <button onClick={handlePrint} disabled={reportLoading || !prediction?.prediccion_id}
+          className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50">
+          <Printer className="w-4 h-4" /> {reportLoading ? 'Generando...' : 'Imprimir'}
+        </button>
+        <button onClick={handleDownloadPDF} disabled={reportLoading || !prediction?.prediccion_id}
+          className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50">
+          <Printer className="w-4 h-4" /> Descargar PDF
         </button>
         <button onClick={handleSendEmail} disabled={sendingEmail || !prediction?.prediccion_id}
           className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50">

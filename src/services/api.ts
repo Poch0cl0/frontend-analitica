@@ -1280,6 +1280,28 @@ export const enviarReportePaciente = async (
   return response.data;
 };
 
-export const ejecutarRecomendacionesS4 = async (pacienteId: number, prediccionId: number): Promise<void> => {
-  await api.post(`/api/recomendaciones/ejecutar/${pacienteId}/${prediccionId}`);
+export interface RecomendacionEjecutadaResponse {
+  paciente_id: number;
+  paciente_nombre: string;
+  prediccion_id: number;
+  prob_prematuro: number | null;
+  nivel_urgencia: string;
+  fuente_generacion: 'gemini' | 'reglas_locales';
+  recomendacion_gemini: {
+    recomendacion_id: number;
+    recomendacion: string;
+    titulo: string;
+    descripcion: string;
+    intervencion: RecomendacionResponse['intervencion'];
+  };
+}
+
+export const ejecutarRecomendacionesS4 = async (
+  pacienteId: number,
+  prediccionId: number,
+): Promise<RecomendacionEjecutadaResponse> => {
+  const response = await api.post<RecomendacionEjecutadaResponse>(
+    `/api/recomendaciones/ejecutar/${pacienteId}/${prediccionId}`,
+  );
+  return response.data;
 };

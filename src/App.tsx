@@ -12,6 +12,7 @@ import { RecommendationsList } from './features/recomendaciones/RecommendationsL
 import FeedbackAnalytics from './features/feedback/FeedbackAnalytics';
 import UsuariosPage from './features/usuarios/UsuariosPage';
 import RecomendacionesPacientePage from './features/recomendaciones/RecomendacionesPacientePage';
+import PrediccionPage from './features/expediente-inteligente/PrediccionPage';
 import { roleAllowed } from './utils/role';
 
 const CLINICAL_ROLES = ['medico', 'administrador'];
@@ -75,6 +76,13 @@ function App() {
             <Route path="/pacientes/:id" element={
               <ProtectedRoute>
                 <SidebarLayout><PacienteDetalle /></SidebarLayout>
+              </ProtectedRoute>
+            } />
+
+            {/* Predicción / Expediente inteligente (solo médico y administrador) */}
+            <Route path="/prediccion" element={
+              <ProtectedRoute allowedRoles={CLINICAL_ROLES}>
+                <SidebarLayout><PrediccionPage /></SidebarLayout>
               </ProtectedRoute>
             } />
 

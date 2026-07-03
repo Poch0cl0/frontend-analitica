@@ -8,6 +8,7 @@ import {
   type MedicoResumen,
 } from '../../services/api';
 import { API_BASE_URL } from '../../services/client';
+import { formatDateTime } from '../../utils/date';
 import { Download, Eye, Edit2, ChevronLeft, ChevronRight, Pill, Activity, HeartPulse } from 'lucide-react';
 import EditRecomendacionModal from './components/EditRecomendacionModal';
 
@@ -325,7 +326,7 @@ export function RecommendationsList() {
                           {item.estado}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-xs font-semibold text-slate-500">{item.fecha}</td>
+                      <td className="py-4 px-4 text-xs font-semibold text-slate-500 whitespace-nowrap">{formatDateTime(item.fecha)}</td>
                       <td className="py-4 px-4 text-xs font-bold text-slate-700">{item.medico_nombre ?? '—'}</td>
                       <td className="py-4 px-6 text-center">
                         <div className="flex justify-center gap-3 text-slate-400">

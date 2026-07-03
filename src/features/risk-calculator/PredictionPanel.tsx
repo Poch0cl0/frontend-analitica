@@ -8,6 +8,13 @@ import {
   getHistorialPredicciones,
   enviarReportePaciente,
 } from '../../services/api';
+import { formatDateTime } from '../../utils/date';
+import {
+  downloadPdfBlob,
+  fetchPrediccionReportPdf,
+  printPdfBlob,
+} from '../../utils/reportPdf';
+import RiskTrendChart from '../../components/prediccion/RiskTrendChart';
 import type {
   PacientePerfilResponse,
   PrediccionUltimaResponse,
@@ -21,7 +28,6 @@ import {
   Search,
   AlertTriangle,
   BrainCircuit,
-  TrendingUp,
   Activity,
   RefreshCw,
   Info,
@@ -105,88 +111,6 @@ const CircularProgress = ({
   );
 };
 
-function riskColor(nivel: string | null | undefined): string {
-  switch (nivel?.toLowerCase()) {
-    case 'critico': case 'crítico': case 'alto': return '#BA1A1A';
-    case 'medio': return '#CA8A04';
-    case 'bajo': return '#16A34A';
-    default: return '#612853';
-  }
-}
-
-interface RiskTrendChartProps {
-  historial: PrediccionHistorialItem[];
-}
-
-const RiskTrendChart: React.FC<RiskTrendChartProps> = ({ historial }) => {
-  const sorted = [...historial]
-    .filter(h => h.prob_consenso != null)
-    .sort((a, b) => new Date(a.fecha_prediccion).getTime() - new Date(b.fecha_prediccion).getTime());
-
-  if (sorted.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
-        <p className="text-sm text-slate-500">Sin historial de predicciones para mostrar tendencia.</p>
-      </div>
-    );
-  }
-
-  const W = 600;
-  const H = 200;
-  const padL = 48;
-  const padR = 16;
-  const padT = 20;
-  const padB = 40;
-  const chartW = W - padL - padR;
-  const chartH = H - padT - padB;
-
-  const points = sorted.map((h, i) => {
-    const x = padL + (sorted.length === 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW);
-    const y = padT + chartH - (Number(h.prob_consenso) * chartH);
-    return { x, y, h };
-  });
-
-  const polyline = points.map(p => `${p.x},${p.y}`).join(' ');
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-5 h-5 text-[#612853]" />
-        <h3 className="font-extrabold text-slate-800 text-sm">Tendencia de Riesgo Prematuro</h3>
-        <span className="text-[10px] text-slate-400 font-medium ml-auto">{sorted.length} predicción{sorted.length !== 1 ? 'es' : ''}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-        {/* Grid lines */}
-        {[0, 25, 50, 75, 100].map(pct => {
-          const y = padT + chartH - (pct / 100) * chartH;
-          return (
-            <g key={pct}>
-              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#F1F5F9" strokeWidth="1" />
-              <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="9" fill="#94A3B8" fontWeight="600">{pct}%</text>
-            </g>
-          );
-        })}
-        {/* Line (only if 2+ points) */}
-        {points.length >= 2 && (
-          <polyline points={polyline} fill="none" stroke="#612853" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        )}
-        {/* Points */}
-        {points.map((p) => (
-          <g key={p.h.id}>
-            <circle cx={p.x} cy={p.y} r="5" fill={riskColor(p.h.nivel_riesgo)} stroke="white" strokeWidth="2" />
-            <text x={p.x} y={H - 8} textAnchor="middle" fontSize="8" fill="#94A3B8" fontWeight="600">
-              {new Date(p.h.fecha_prediccion).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <p className="text-[10px] text-slate-400 font-medium mt-2 text-center">
-        El gráfico se actualiza automáticamente con cada nueva predicción registrada.
-      </p>
-    </div>
-  );
-};
-
 export const PredictionPanel: React.FC = () => {
   const navigate = useNavigate();
 
@@ -208,6 +132,7 @@ export const PredictionPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(true);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
   const [emailMsg, setEmailMsg] = useState<string | null>(null);
 
   // Cargar lista de pacientes al montar
@@ -281,9 +206,40 @@ export const PredictionPanel: React.FC = () => {
     }
   };
 
-  // Imprimir reporte clínico
-  const handlePrint = () => {
-    window.print();
+  const loadReportPdf = async () => {
+    if (selectedPacienteId === null) throw new Error('Sin paciente');
+    return fetchPrediccionReportPdf(selectedPacienteId);
+  };
+
+  const handlePrint = async () => {
+    if (selectedPacienteId === null) return;
+    setReportLoading(true);
+    setEmailMsg(null);
+    try {
+      printPdfBlob(await loadReportPdf());
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail
+        ?? (err as Error)?.message;
+      setEmailMsg(typeof detail === 'string' ? detail : 'No se pudo imprimir el reporte.');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (selectedPacienteId === null) return;
+    setReportLoading(true);
+    setEmailMsg(null);
+    try {
+      const blob = await loadReportPdf();
+      const dni = profile?.dni ?? String(selectedPacienteId);
+      downloadPdfBlob(blob, `prediccion_${dni}.pdf`);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setEmailMsg(typeof detail === 'string' ? detail : 'No se pudo generar el reporte PDF.');
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const handleSendEmail = async () => {
@@ -390,14 +346,7 @@ export const PredictionPanel: React.FC = () => {
   // Formatear fecha de última consulta/predicción
   const getFormattedDate = () => {
     if (prediction?.fecha_prediccion) {
-      const date = new Date(prediction.fecha_prediccion);
-      return date.toLocaleDateString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      return formatDateTime(prediction.fecha_prediccion, 'Sin consultas previas');
     }
     return 'Sin consultas previas';
   };
@@ -549,13 +498,22 @@ export const PredictionPanel: React.FC = () => {
         <div className="flex items-center justify-between sm:justify-end gap-6 border-t border-slate-100 lg:border-t-0 pt-4 lg:pt-0">
           <button 
             onClick={handlePrint}
-            className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition print:hidden"
-            title="Imprimir reporte"
+            disabled={reportLoading || !prediction?.prediccion_id}
+            className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition print:hidden disabled:opacity-50"
+            title="Imprimir reporte PDF"
+          >
+            <Printer className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleDownloadPDF}
+            disabled={reportLoading || !prediction?.prediccion_id}
+            className="p-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition print:hidden disabled:opacity-50"
+            title="Descargar reporte PDF"
           >
             <Printer className="w-5 h-5" />
           </button>
           <div className="text-left sm:text-right">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Última Consulta</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Último análisis</span>
             <span className="text-sm font-semibold text-slate-700 flex items-center sm:justify-end gap-1.5 mt-0.5">
               <RefreshCw className="w-3.5 h-3.5 text-slate-400" /> {getFormattedDate()}
             </span>
@@ -828,9 +786,17 @@ export const PredictionPanel: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-4 print:hidden">
         <button
           onClick={handlePrint}
-          className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2 shadow-sm"
+          disabled={reportLoading || !prediction?.prediccion_id}
+          className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
         >
-          <Printer className="w-4 h-4 text-slate-500" /> Imprimir Reporte Clínico
+          <Printer className="w-4 h-4 text-slate-500" /> {reportLoading ? 'Generando...' : 'Imprimir'}
+        </button>
+        <button
+          onClick={handleDownloadPDF}
+          disabled={reportLoading || !prediction?.prediccion_id}
+          className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-700 text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+        >
+          <Printer className="w-4 h-4 text-slate-500" /> Descargar PDF
         </button>
         <button
           onClick={handleSendEmail}

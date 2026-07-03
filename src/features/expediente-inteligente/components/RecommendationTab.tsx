@@ -1,4 +1,5 @@
 import { useRecomendaciones } from '../hooks/useRecomendaciones';
+import { formatDateTimeLong } from '../../../utils/date';
 import { RefreshCw, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface RecommendationTabProps {
@@ -6,7 +7,7 @@ interface RecommendationTabProps {
 }
 
 export default function RecommendationTab({ pacienteId }: RecommendationTabProps) {
-  const { recomendaciones, loading, generating, error, generar } = useRecomendaciones(pacienteId);
+  const { recomendaciones, loading, generating, error, infoMsg, generar } = useRecomendaciones(pacienteId);
 
   if (loading) {
     return (
@@ -23,6 +24,16 @@ export default function RecommendationTab({ pacienteId }: RecommendationTabProps
         <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl text-amber-800 text-sm flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {infoMsg && (
+        <div className={`p-4 rounded-xl text-sm font-semibold border ${
+          infoMsg.includes('Gemini')
+            ? 'text-emerald-800 bg-emerald-50 border-emerald-200'
+            : 'text-amber-800 bg-amber-50 border-amber-200'
+        }`}>
+          {infoMsg}
         </div>
       )}
 
@@ -55,7 +66,17 @@ export default function RecommendationTab({ pacienteId }: RecommendationTabProps
                   {rec.estado || 'Activo'}
                 </span>
               </div>
-              {rec.algoritmo === 'gemini' && (
+              {rec.origen === 'gemini' && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border border-blue-100">
+                  <Sparkles className="w-3 h-3" /> Google Gemini
+                </div>
+              )}
+              {rec.origen === 'reglas_locales' && (
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-100">
+                  Reglas clínicas locales
+                </div>
+              )}
+              {rec.origen !== 'gemini' && rec.origen !== 'reglas_locales' && rec.algoritmo === 'gemini' && (
                 <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border border-blue-100">
                   <Sparkles className="w-3 h-3" /> Generado por IA
                 </div>
@@ -72,10 +93,8 @@ export default function RecommendationTab({ pacienteId }: RecommendationTabProps
                   <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{rec.intervencion.categoria}</span>
                 </div>
               )}
-              <p className="text-[9px] text-gray-400">
-                {rec.fecha_recomendacion
-                  ? new Date(rec.fecha_recomendacion).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
-                  : 'Fecha no registrada'}
+              <p className="text-[10px] text-gray-500">
+                Generado: {formatDateTimeLong(rec.fecha_recomendacion)}
               </p>
             </div>
           ))}

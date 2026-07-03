@@ -9,6 +9,7 @@ import {
 } from '../../services/api';
 import type { RecomendacionResponse, PacienteResponse } from '../../services/api';
 import { getApiErrorMessage } from '../../services/client';
+import { formatDateTimeLong } from '../../utils/date';
 
 const PRIMARY = '#612853';
 
@@ -160,14 +161,8 @@ export default function RecomendacionesPacientePage() {
               {rec.notas && (
                 <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 border border-gray-100">{rec.notas}</p>
               )}
-              <p className="text-[10px] text-gray-400">
-                {rec.fecha_recomendacion
-                  ? new Date(rec.fecha_recomendacion).toLocaleDateString('es-ES', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                    })
-                  : 'Fecha no registrada'}
+              <p className="text-[10px] text-gray-500">
+                Generado: {formatDateTimeLong(rec.fecha_recomendacion)}
               </p>
             </div>
           ))}
