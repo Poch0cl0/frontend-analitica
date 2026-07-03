@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePrediccion } from '../hooks/usePrediccion';
+import { useUserRole } from '../../../hooks/useUserRole';
 import MedicoDictamenForm from './MedicoDictamenForm';
 import PredictionFeedback from './PredictionFeedback';
 import ModelFeedback from './ModelFeedback';
@@ -106,6 +107,7 @@ function RiskTrendChart({ historial }: { historial: PrediccionHistorialItem[] })
 }
 
 export default function PredictionTab({ pacienteId }: PredictionTabProps) {
+  const { isDoctor } = useUserRole();
   const { profile, prediction, historial, loading, calculating, error, sinDatosClinicos, ejecutar } = usePrediccion(pacienteId);
   const [isAccordionOpen, setIsAccordionOpen] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -240,7 +242,7 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
                     <p className="text-xs font-bold text-slate-500">Parto: <span className="text-[#612853] font-black">{model.semanas_estimadas} sem</span></p>
                     <p className="text-[8px] text-slate-400 mt-0.5">IC 95%: {meta.ic95}</p>
                   </div>
-                  {prediction?.prediccion_id && (
+                  {isDoctor && prediction?.prediccion_id && (
                     <>
                       <ModelFeedback
                         prediccionId={prediction.prediccion_id}
@@ -310,7 +312,7 @@ export default function PredictionTab({ pacienteId }: PredictionTabProps) {
         />
       )}
 
-      {prediction?.prediccion_id && (
+      {isDoctor && prediction?.prediccion_id && (
         <PredictionFeedback prediccionId={prediction.prediccion_id} />
       )}
 

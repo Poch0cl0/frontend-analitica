@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from 'recharts';
 import {
   getCitas,
@@ -11,7 +11,7 @@ import {
   type DashboardOperativo,
   type MedicoResumen,
 } from '../../services/api';
-import { defaultAnalyticsRange, formatAnalyticsPeriodo } from '../../utils/analyticsTimeSeries';
+import { defaultAnalyticsRange, fillSeries, formatAnalyticsPeriodo, generateAllPeriods } from '../../utils/analyticsTimeSeries';
 import { useUserRole } from '../../hooks/useUserRole';
 import SearchableEntitySelect from '../../components/ui/SearchableEntitySelect';
 import { formatCitaFechaHora, sortCitasPorProximidad } from '../../utils/citaTime';
@@ -40,6 +40,23 @@ const ESTADOS_FILTRO = [
 
 const PAGE_SIZES = [10, 20, 50];
 
+const AGENDA_COLORS = {
+  slots_libres: '#64748b',
+  slots_ocupados: '#0d9488',
+};
+
+const EMPTY_CITA = {
+  programada: 0,
+  en_atencion: 0,
+  cumplida: 0,
+  cancelada: 0,
+  reprogramada: 0,
+  no_asistio_paciente: 0,
+  no_asistio_medico: 0,
+  slots_libres: 0,
+  slots_ocupados: 0,
+};
+
 function horaCita(iso: string): string {
   const base = iso.replace('Z', '').slice(11, 16);
   return base || '—';
@@ -47,7 +64,7 @@ function horaCita(iso: string): string {
 
 export default function OperativoDashboardPanel() {
   const { isDoctor, isAdmin, isSecretary } = useUserRole();
-  const [range, setRange] = useState(defaultAnalyticsRange);
+  const [range, setRange] = useState(() => defaultAnalyticsRange('month'));
   const [granularidad, setGranularidad] = useState<AnalyticsGranularidad>('month');
   const [medicoId, setMedicoId] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
@@ -106,17 +123,33 @@ export default function OperativoDashboardPanel() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadCitas(); setPage(1); }, [loadCitas]);
 
+  const handleGranularidadChange = (g: AnalyticsGranularidad) => {
+    setGranularidad(g);
+    setRange(defaultAnalyticsRange(g));
+    setPage(1);
+  };
+
+  const allPeriods = useMemo(
+    () => generateAllPeriods(range.desde, range.hasta, granularidad),
+    [range.desde, range.hasta, granularidad],
+  );
+
   const chartData = useMemo(() => {
     if (!data) return [];
-    return data.serie_citas.map((row) => ({
+    const filled = fillSeries(data.serie_citas, allPeriods, EMPTY_CITA, granularidad);
+    return filled.map((row) => ({
       periodo: formatAnalyticsPeriodo(row.periodo, granularidad),
       Atendidas: row.cumplida,
       Programadas: row.programada,
       'En atención': row.en_atencion,
       Canceladas: row.cancelada,
       Reprogramadas: row.reprogramada,
+      'No asistió paciente': row.no_asistio_paciente,
+      'No asistió médico': row.no_asistio_medico,
+      'Horarios libres': row.slots_libres ?? 0,
+      'Horarios ocupados': row.slots_ocupados ?? 0,
     }));
-  }, [data, granularidad]);
+  }, [data, allPeriods, granularidad]);
 
   const citasFiltradas = useMemo(() => {
     const q = busquedaCita.trim().toLowerCase();
@@ -173,7 +206,7 @@ export default function OperativoDashboardPanel() {
           </div>
           <div>
             <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Agrupar</label>
-            <select value={granularidad} onChange={(e) => setGranularidad(e.target.value as AnalyticsGranularidad)}
+            <select value={granularidad} onChange={(e) => handleGranularidadChange(e.target.value as AnalyticsGranularidad)}
               className="text-xs px-2 py-1.5 border rounded-lg">
               <option value="day">Día</option>
               <option value="week">Semana</option>
@@ -197,57 +230,77 @@ export default function OperativoDashboardPanel() {
       </div>
 
       {k && (
-        <div className="p-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { label: 'Pacientes', value: k.total_pacientes, color: 'text-gray-900' },
-            { label: 'Atendidas', value: k.realizadas, color: 'text-gray-700' },
-            { label: 'Pendientes', value: k.pendientes, color: 'text-blue-700' },
-            { label: 'Canceladas', value: k.canceladas, color: 'text-red-700' },
-            { label: 'Reprogramadas', value: k.reprogramadas, color: 'text-purple-700' },
-            { label: 'Ocupación', value: `${k.nivel_ocupacion}%`, color: 'text-fuchsia-800' },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase">{item.label}</p>
-              <p className={`text-2xl font-extrabold mt-1 ${item.color}`}>{item.value}</p>
+        <div className="px-6 pt-6 space-y-5">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Resumen del período</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { label: 'Pacientes activos', value: k.total_pacientes, accent: null },
+                { label: 'Atendidas', value: k.realizadas, accent: CITA_COLORS.cumplida },
+                { label: 'Pendientes', value: k.pendientes, accent: null },
+                { label: 'Canceladas', value: k.canceladas, accent: CITA_COLORS.cancelada },
+                { label: 'Reprogramadas', value: k.reprogramadas, accent: CITA_COLORS.reprogramada },
+                { label: 'Ocupación agenda', value: `${k.nivel_ocupacion}%`, accent: null },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl bg-gray-50 border border-gray-100 p-3"
+                  style={item.accent ? { borderLeftWidth: 3, borderLeftColor: item.accent } : undefined}
+                >
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">{item.label}</p>
+                  <p className="text-2xl font-extrabold mt-1 text-gray-900">{item.value}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div>
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-2">Capacidad de agenda y ausencias (totales del período)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Horarios libres', value: k.slots_libres, hint: 'Slots disponibles' },
+                { label: 'Horarios ocupados', value: k.slots_ocupados, hint: 'Slots con cita' },
+                { label: 'No asistió paciente', value: k.no_asistio_paciente, hint: 'Ausencia paciente' },
+                { label: 'No asistió médico', value: k.no_asistio_medico, hint: 'Ausencia médico' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                  <p className="text-[10px] text-slate-500 font-semibold uppercase">{item.label}</p>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{item.value}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">{item.hint}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="px-6 pb-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-center">
-          <p className="text-[10px] text-emerald-700 font-semibold uppercase">Horarios libres</p>
-          <p className="text-xl font-bold text-emerald-800">{k?.slots_libres ?? 0}</p>
+      {chartData.length > 0 && (
+        <div className="px-6 pt-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Citas y agenda en el tiempo</p>
+          <p className="text-[10px] text-gray-400 mb-2">Barras: estados de cita · Líneas (eje derecho): horarios libres y ocupados</p>
         </div>
-        <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-center">
-          <p className="text-[10px] text-blue-700 font-semibold uppercase">Horarios ocupados</p>
-          <p className="text-xl font-bold text-blue-800">{k?.slots_ocupados ?? 0}</p>
-        </div>
-        <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-center">
-          <p className="text-[10px] text-amber-700 font-semibold uppercase">No asistió paciente</p>
-          <p className="text-xl font-bold text-amber-800">{k?.no_asistio_paciente ?? 0}</p>
-        </div>
-        <div className="rounded-lg border border-rose-100 bg-rose-50 p-3 text-center">
-          <p className="text-[10px] text-rose-700 font-semibold uppercase">No asistió médico</p>
-          <p className="text-xl font-bold text-rose-800">{k?.no_asistio_medico ?? 0}</p>
-        </div>
-      </div>
+      )}
 
       {chartData.length > 0 && (
-        <div className="p-6 pt-2 h-80">
+        <div className={`px-6 pb-4 h-96 relative transition-opacity ${loading ? 'opacity-50' : ''}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="periodo" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <YAxis yAxisId="citas" tick={{ fontSize: 10 }} allowDecimals={false} width={36} />
+              <YAxis yAxisId="agenda" orientation="right" tick={{ fontSize: 10 }} allowDecimals={false} width={40} />
               <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Atendidas" stackId="a" fill={CITA_COLORS.cumplida} />
-              <Bar dataKey="Programadas" stackId="a" fill={CITA_COLORS.programada} />
-              <Bar dataKey="En atención" stackId="a" fill={CITA_COLORS.en_atencion} />
-              <Bar dataKey="Canceladas" stackId="a" fill={CITA_COLORS.cancelada} />
-              <Bar dataKey="Reprogramadas" stackId="a" fill={CITA_COLORS.reprogramada} />
-            </BarChart>
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Bar yAxisId="citas" dataKey="Atendidas" stackId="citas" fill={CITA_COLORS.cumplida} />
+              <Bar yAxisId="citas" dataKey="Programadas" stackId="citas" fill={CITA_COLORS.programada} />
+              <Bar yAxisId="citas" dataKey="En atención" stackId="citas" fill={CITA_COLORS.en_atencion} />
+              <Bar yAxisId="citas" dataKey="Canceladas" stackId="citas" fill={CITA_COLORS.cancelada} />
+              <Bar yAxisId="citas" dataKey="Reprogramadas" stackId="citas" fill={CITA_COLORS.reprogramada} />
+              <Bar yAxisId="citas" dataKey="No asistió paciente" stackId="citas" fill={CITA_COLORS.no_asistio_paciente} />
+              <Bar yAxisId="citas" dataKey="No asistió médico" stackId="citas" fill={CITA_COLORS.no_asistio_medico} />
+              <Line yAxisId="agenda" type="monotone" dataKey="Horarios libres" stroke={AGENDA_COLORS.slots_libres} strokeWidth={2} dot={false} />
+              <Line yAxisId="agenda" type="monotone" dataKey="Horarios ocupados" stroke={AGENDA_COLORS.slots_ocupados} strokeWidth={2} dot={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}

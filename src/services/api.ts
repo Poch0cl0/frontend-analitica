@@ -36,6 +36,8 @@ export interface SerieCitasPeriodo {
   reprogramada: number;
   no_asistio_paciente: number;
   no_asistio_medico: number;
+  slots_libres?: number;
+  slots_ocupados?: number;
 }
 
 export interface SerieRiesgoPeriodo {

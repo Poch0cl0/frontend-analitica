@@ -78,7 +78,7 @@ export default function FeedbackDashboardSummary() {
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {isAdmin
-              ? 'Vista general o por médico. Filtre modelo y tipo (probabilidad / semanas).'
+              ? 'Solo los médicos registran votos. Vista general o por médico.'
               : 'Votación de todos los médicos o solo la suya. Filtre modelo y tipo.'}
           </p>
           <p className="text-[10px] font-bold text-fuchsia-800 mt-1.5 uppercase tracking-wide">
@@ -143,7 +143,7 @@ export default function FeedbackDashboardSummary() {
         <p className="text-xs text-gray-400 py-4 text-center">Cargando métricas...</p>
       ) : sinDatos ? (
         <p className="text-xs text-gray-500">
-          No hay votos con estos filtros. Califique predicciones desde el expediente inteligente.
+          No hay votos de médicos con estos filtros. Los médicos califican predicciones desde el expediente inteligente.
         </p>
       ) : (
         <div className="overflow-x-auto">
