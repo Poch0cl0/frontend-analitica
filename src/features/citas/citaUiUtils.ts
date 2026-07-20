@@ -52,10 +52,13 @@ export function formatHour(isoStr: string) {
 export function formatFullDate(isoStr: string) {
   try {
     const dt = new Date(isoStr);
-    return dt.toLocaleDateString('es-ES', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    ];
+    const hora = dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${dias[dt.getDay()]}, ${dt.getDate()} de ${meses[dt.getMonth()]} de ${dt.getFullYear()}, ${hora}`;
   } catch {
     return isoStr;
   }

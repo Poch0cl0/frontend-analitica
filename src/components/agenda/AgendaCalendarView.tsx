@@ -8,7 +8,7 @@ import {
   type SlotCalendario,
 } from '../../services/api';
 import { PRIMARY } from '../../constants/theme';
-import { formatLocalDate } from '../../utils/date';
+import { formatLocalDate, weekdayLong, weekdayShort, DIAS_SEMANA_CORTO_LUNES } from '../../utils/date';
 import type { SlotSeleccionado } from '../../features/citas/components/AgendaSemanalView';
 
 export type VistaCalendario = 'semana' | 'mes';
@@ -87,6 +87,7 @@ function formatDisplayDate(dateStr: string): string {
 interface AgendaCalendarViewProps {
   duracionMinutos: number;
   medicoId?: number | null;
+  reloadKey?: number;
   onSelectLibre: (slot: SlotSeleccionado) => void;
   onSelectOcupado: (citaId: number) => void;
 }
@@ -94,6 +95,7 @@ interface AgendaCalendarViewProps {
 export default function AgendaCalendarView({
   duracionMinutos,
   medicoId,
+  reloadKey = 0,
   onSelectLibre,
   onSelectOcupado,
 }: AgendaCalendarViewProps) {
@@ -166,7 +168,7 @@ export default function AgendaCalendarView({
     } finally {
       setIsLoading(false);
     }
-  }, [ventana.desde, ventana.hasta, duracionMinutos, medicoId, filtro, vista]);
+  }, [ventana.desde, ventana.hasta, duracionMinutos, medicoId, filtro, vista, reloadKey]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -417,7 +419,7 @@ export default function AgendaCalendarView({
                   className="text-left mb-2 pb-2 border-b border-gray-100"
                 >
                   <p className="text-[10px] font-bold text-gray-400 uppercase">
-                    {parseDate(fecha).toLocaleDateString('es-PE', { weekday: 'short' })}
+                    {weekdayShort(parseDate(fecha))}
                   </p>
                   <p className="text-sm font-extrabold text-gray-900">
                     {parseDate(fecha).getDate()}/{parseDate(fecha).getMonth() + 1}
@@ -449,7 +451,12 @@ export default function AgendaCalendarView({
                         )}
                         {slot.tipo === 'libre' && slot.medicos_disponibles.length > 0 && (
                           <span className="block text-emerald-700">
-                            {slot.medicos_disponibles.length} médico(s)
+                            Libre: {slot.medicos_disponibles.map((m) => m.nombre.split(' ')[0]).join(', ')}
+                          </span>
+                        )}
+                        {slot.tipo !== 'libre' && slot.medico_nombre && (
+                          <span className="block text-[9px] font-normal opacity-80 truncate">
+                            {slot.medico_nombre}
                           </span>
                         )}
                       </button>
@@ -465,7 +472,7 @@ export default function AgendaCalendarView({
       {!isLoading && vista === 'mes' && (
         <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4">
           <div className="grid grid-cols-7 gap-1 mb-1">
-            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
+            {DIAS_SEMANA_CORTO_LUNES.map((d) => (
               <div key={d} className="text-center text-[10px] font-bold text-gray-400 py-2">
                 {d}
               </div>
@@ -524,13 +531,11 @@ export default function AgendaCalendarView({
 
       {vista === 'mes' && diaSeleccionado && enRango(diaSeleccionado) && (
         <div className="bg-white rounded-xl border p-4">
-          <h4 className="font-bold text-gray-900 mb-3">
-            {parseDate(diaSeleccionado).toLocaleDateString('es-PE', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
+          <h4 className="font-bold text-gray-900 mb-3 capitalize">
+            {(() => {
+              const d = parseDate(diaSeleccionado);
+              return `${weekdayLong(d)}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+            })()}
           </h4>
           {!diaDetalle ? (
             <p className="text-sm text-gray-500">Cargando detalle del día…</p>
@@ -553,6 +558,14 @@ export default function AgendaCalendarView({
                   )}
                   {slot.paciente_nombre && (
                     <span className="block truncate font-normal">{slot.paciente_nombre}</span>
+                  )}
+                  {slot.tipo === 'libre' && slot.medicos_disponibles.length > 0 && (
+                    <span className="block text-[10px] text-emerald-700 font-semibold truncate">
+                      Libre: {slot.medicos_disponibles.map((m) => m.nombre.split(' ')[0]).join(', ')}
+                    </span>
+                  )}
+                  {slot.tipo !== 'libre' && slot.medico_nombre && (
+                    <span className="block text-[9px] font-normal opacity-80 truncate">{slot.medico_nombre}</span>
                   )}
                 </button>
               ))}

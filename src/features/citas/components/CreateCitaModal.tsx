@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { PRIMARY } from '../../../constants/theme';
 import { useModalBackdrop } from '../../../hooks/useModalBackdrop';
 import DisponibilidadSlots from '../../../components/ui/DisponibilidadSlots';
+import DisponibilidadMesPicker from '../../../components/ui/DisponibilidadMesPicker';
 import { useDisponibilidadCita } from '../../../hooks/useDisponibilidadCita';
 import SearchableEntitySelect from '../../../components/ui/SearchableEntitySelect';
 import type { MedicoResumen, PacienteResponse } from '../../../services/api';
@@ -59,7 +60,7 @@ export default function CreateCitaModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/60 flex items-center justify-center p-4 backdrop-blur-xs" {...backdrop}>
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-gray-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-extrabold text-lg text-gray-900">Agendar Nueva Cita</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
@@ -89,7 +90,7 @@ export default function CreateCitaModal({
             mode="medico"
             label="Obstetra Médico *"
             value={form.medico_id}
-            onChange={(v) => onChange({ ...form, medico_id: v })}
+            onChange={(v) => onChange({ ...form, medico_id: v, fecha: '', hora: '' })}
             medicos={medicos}
             required
           />
@@ -105,29 +106,28 @@ export default function CreateCitaModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Fecha *</label>
-              <input
-                type="date"
-                required
-                value={form.fecha}
-                onChange={(e) => onChange({ ...form, fecha: e.target.value })}
-                className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Duración</label>
-              <select
-                value={form.duracion_minutos}
-                onChange={(e) => onChange({ ...form, duracion_minutos: Number(e.target.value) })}
-                className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
-              >
-                {[15, 30, 45, 60, 90, 120].map((m) => (
-                  <option key={m} value={m}>{m} min</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Duración</label>
+            <select
+              value={form.duracion_minutos}
+              onChange={(e) => onChange({ ...form, duracion_minutos: Number(e.target.value), hora: '' })}
+              className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+            >
+              {[15, 30, 45, 60, 90, 120].map((m) => (
+                <option key={m} value={m}>{m} min</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Fecha *</label>
+            <DisponibilidadMesPicker
+              medicoId={medicoId}
+              value={form.fecha}
+              duracionMinutos={form.duracion_minutos}
+              onChange={(fecha) => onChange({ ...form, fecha, hora: '' })}
+            />
+            <input type="hidden" required value={form.fecha} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

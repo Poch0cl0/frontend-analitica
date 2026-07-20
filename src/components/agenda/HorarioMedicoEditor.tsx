@@ -10,8 +10,9 @@ import {
   type HorarioValidacionResponse,
 } from '../../services/api';
 import { PRIMARY } from '../../constants/theme';
+import { DIAS_SEMANA_LARGO_LUNES } from '../../utils/date';
 
-const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const DIAS = DIAS_SEMANA_LARGO_LUNES;
 
 interface BloqueForm {
   dia_semana: number;

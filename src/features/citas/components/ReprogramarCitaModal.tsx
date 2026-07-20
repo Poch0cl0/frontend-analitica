@@ -8,6 +8,7 @@ import { PRIMARY } from '../../../constants/theme';
 import { formatLocalDate } from '../../../utils/date';
 import { useModalBackdrop } from '../../../hooks/useModalBackdrop';
 import DisponibilidadSlots from '../../../components/ui/DisponibilidadSlots';
+import DisponibilidadMesPicker from '../../../components/ui/DisponibilidadMesPicker';
 import SearchableEntitySelect from '../../../components/ui/SearchableEntitySelect';
 import { useDisponibilidadCita } from '../../../hooks/useDisponibilidadCita';
 
@@ -79,13 +80,29 @@ export default function ReprogramarCitaModal({
             mode="medico"
             label="Médico"
             value={medicoId}
-            onChange={setMedicoId}
+            onChange={(id) => {
+              setMedicoId(id);
+              setFecha('');
+              setHora('');
+            }}
             medicos={medicos}
             required
           />
-          <div className="grid grid-cols-2 gap-2">
-            <input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} className="text-sm px-3 py-2 border rounded-xl" />
-            <input type="time" required value={hora} onChange={(e) => setHora(e.target.value)} className="text-sm px-3 py-2 border rounded-xl" />
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva fecha *</label>
+            <DisponibilidadMesPicker
+              medicoId={medicoNum}
+              value={fecha}
+              duracionMinutos={duracion}
+              onChange={(f) => {
+                setFecha(f);
+                setHora('');
+              }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva hora *</label>
+            <input type="time" required value={hora} onChange={(e) => setHora(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-xl" />
           </div>
           {medicoNum && fecha && (
             <DisponibilidadSlots

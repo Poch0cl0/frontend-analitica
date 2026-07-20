@@ -12,6 +12,7 @@ import { useModalBackdrop } from '../../../hooks/useModalBackdrop';
 import { citaPermiteAusencia, formatCitaFechaHora } from '../../../utils/citaTime';
 import SearchableEntitySelect from '../../../components/ui/SearchableEntitySelect';
 import DisponibilidadSlots from '../../../components/ui/DisponibilidadSlots';
+import DisponibilidadMesPicker from '../../../components/ui/DisponibilidadMesPicker';
 import { useDisponibilidadCita } from '../../../hooks/useDisponibilidadCita';
 import { formatFullDate, getStatusBadgeStyles, getStatusLabel } from '../citaUiUtils';
 
@@ -294,31 +295,35 @@ export default function EditCitaModal({
               mode="medico"
               label="Obstetra"
               value={repMedicoId}
-              onChange={setRepMedicoId}
+              onChange={(id) => {
+                setRepMedicoId(id);
+                setRepFecha('');
+                setRepHora('');
+              }}
               medicos={medicos}
               required
             />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva fecha</label>
-                <input
-                  type="date"
-                  required
-                  value={repFecha}
-                  onChange={(e) => setRepFecha(e.target.value)}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva hora</label>
-                <input
-                  type="time"
-                  required
-                  value={repHora}
-                  onChange={(e) => setRepHora(e.target.value)}
-                  className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva fecha</label>
+              <DisponibilidadMesPicker
+                medicoId={repMedicoNum}
+                value={repFecha}
+                duracionMinutos={repDuracion}
+                onChange={(f) => {
+                  setRepFecha(f);
+                  setRepHora('');
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Nueva hora</label>
+              <input
+                type="time"
+                required
+                value={repHora}
+                onChange={(e) => setRepHora(e.target.value)}
+                className="w-full text-sm px-3.5 py-2.5 border border-gray-200 rounded-xl bg-gray-50"
+              />
             </div>
             {repMedicoNum && repFecha && (
               <DisponibilidadSlots

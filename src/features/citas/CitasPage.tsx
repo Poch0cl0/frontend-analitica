@@ -75,6 +75,7 @@ export default function CitasPage() {
   const [selectedSlotCita, setSelectedSlotCita] = useState<CitaResponseEnriquecida | null>(null);
   const [isSavingSlot, setIsSavingSlot] = useState(false);
   const [filterMedicoAgenda, setFilterMedicoAgenda] = useState('');
+  const [agendaReloadKey, setAgendaReloadKey] = useState(0);
 
   const closeModal = () => setActiveModal(null);
 
@@ -249,19 +250,13 @@ export default function CitasPage() {
       });
       setSelectedSlot(null);
       setActiveModal(null);
-      setFilterFechaDesde(payload.fecha);
-      setFilterFechaHasta(payload.fecha);
-      setActiveTab('lista');
-      showToast('Cita programada con éxito', 'success');
+      setActiveTab('agenda');
+      setAgendaReloadKey((k) => k + 1);
+      showToast('Cita programada. La agenda se actualizó.', 'success');
       try {
-        const [data, meds] = await Promise.all([
-          getCitas(undefined, undefined, filterEstado || undefined, payload.fecha, payload.fecha),
-          getMedicos(),
-        ]);
-        setCitas(sortCitasPorProximidad(data));
-        setMedicos(meds);
+        await loadCitas();
       } catch {
-        showToast('Cita creada. Si no aparece en la lista, actualice la página.', 'success');
+        /* la agenda ya se refresca con reloadKey */
       }
     } catch (err: unknown) {
       showToast(getApiErrorMessage(err, 'No se pudo programar la cita'), 'error');
@@ -344,6 +339,7 @@ export default function CitasPage() {
           <AgendaCalendarView
             duracionMinutos={duracionAgenda}
             medicoId={filterMedicoAgenda ? Number(filterMedicoAgenda) : null}
+            reloadKey={agendaReloadKey}
             onSelectLibre={(slot) => { setSelectedSlot(slot); setActiveModal('slot'); }}
             onSelectOcupado={handleSelectOcupado}
           />
@@ -390,7 +386,7 @@ export default function CitasPage() {
         <CitaSlotAccionesModal
           cita={selectedSlotCita}
           onClose={() => { setSelectedSlotCita(null); setActiveModal(null); }}
-          onUpdated={loadCitas}
+          onUpdated={() => { loadCitas(); setAgendaReloadKey((k) => k + 1); }}
           onReprogramar={(c) => { setSelectedSlotCita(c); setActiveModal('reprogramar'); }}
         />
       )}
@@ -400,7 +396,7 @@ export default function CitasPage() {
           cita={selectedSlotCita}
           medicos={medicos}
           onClose={() => setActiveModal('slotCita')}
-          onDone={loadCitas}
+          onDone={() => { loadCitas(); setAgendaReloadKey((k) => k + 1); }}
         />
       )}
 

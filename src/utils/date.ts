@@ -6,6 +6,37 @@ export function formatLocalDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Índices JS getDay(): Dom=0 … Sáb=6. Evita toLocaleDateString(weekday) (en algunos Windows sale mal “Vie”). */
+export const DIAS_SEMANA_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
+export const DIAS_SEMANA_LARGO = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+] as const;
+/** Lun=0 … Dom=6 (ISO / backend). */
+export const DIAS_SEMANA_CORTO_LUNES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
+export const DIAS_SEMANA_LARGO_LUNES = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+] as const;
+
+export function weekdayShort(d: Date): string {
+  return DIAS_SEMANA_CORTO[d.getDay()];
+}
+
+export function weekdayLong(d: Date): string {
+  return DIAS_SEMANA_LARGO[d.getDay()];
+}
+
 /** API devuelve datetimes naive en hora de Lima (sin sufijo Z). */
 function parseApiDateTime(iso: string | null | undefined): Date | null {
   if (!iso) return null;

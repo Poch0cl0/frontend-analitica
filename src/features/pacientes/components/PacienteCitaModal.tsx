@@ -1,5 +1,6 @@
 import type { FormEvent, ChangeEvent } from 'react';
 import DisponibilidadSlots from '../../../components/ui/DisponibilidadSlots';
+import DisponibilidadMesPicker from '../../../components/ui/DisponibilidadMesPicker';
 import SearchableEntitySelect from '../../../components/ui/SearchableEntitySelect';
 import { useDisponibilidadCita } from '../../../hooks/useDisponibilidadCita';
 import { PRIMARY } from '../../../constants/theme';
@@ -98,20 +99,31 @@ export default function PacienteCitaModal({
                 mode="medico"
                 label="Obstetra Médico *"
                 value={form.medico_id}
-                onChange={onMedicoChange}
+                onChange={(medicoId) => {
+                  onMedicoChange(medicoId);
+                  onChange({ target: { name: 'fecha', value: '' } } as ChangeEvent<HTMLInputElement>);
+                  onSelectHora('');
+                }}
                 medicos={medicos}
                 required
               />
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha *</label>
-                <input type="date" name="fecha" required value={form.fecha} onChange={onChange} className={inputCls} style={borderStyle} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Hora *</label>
-                <input type="time" name="hora" required value={form.hora} onChange={onChange} className={inputCls} style={borderStyle} />
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha *</label>
+              <DisponibilidadMesPicker
+                medicoId={medicoIdForDisponibilidad}
+                value={form.fecha}
+                duracionMinutos={form.duracion_minutos}
+                onChange={(fecha) => {
+                  onChange({ target: { name: 'fecha', value: fecha } } as ChangeEvent<HTMLInputElement>);
+                  onSelectHora('');
+                }}
+              />
+              <input type="hidden" name="fecha" required value={form.fecha} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Hora *</label>
+              <input type="time" name="hora" required value={form.hora} onChange={onChange} className={inputCls} style={borderStyle} />
             </div>
             {medicoIdForDisponibilidad && form.fecha && (
               <DisponibilidadSlots
